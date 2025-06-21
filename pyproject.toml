@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stonks"
+version = "0.1.0"
+description = "CLI for stock pattern detection"
+authors = [{ name = "Your Name", email = "your@email.com" }]
+readme = "readme.txt"
+requires-python = ">=3.8"
+dependencies = [
+    "click",
+    "pandas",
+    "yfinance",
+    "scikit-learn",
+    "pyyaml"
+]
+
+[project.scripts]
+stonks = "project.stonks_cli:cli"

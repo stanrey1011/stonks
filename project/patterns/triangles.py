@@ -17,15 +17,20 @@ def fit_trendline(points):
     model = LinearRegression().fit(x, y)
     return model.coef_[0][0], model.intercept_[0]  # slope, intercept
 
-def detect_triangle_patterns(ticker, window=5, lookback=60):
-    file_path = os.path.join(DATA_DIR, f"{ticker}.csv")
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"No data for {ticker}")
+def detect_triangle_patterns(ticker, window=5, lookback=60, df=None):
+    if df is None:
+        file_path = os.path.join(DATA_DIR, f"{ticker}.csv")
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"No data for {ticker}")
+        df = pd.read_csv(file_path, parse_dates=["Date"])
+        print(f"[DEBUG] Loaded {ticker}: {df.columns}")
 
-    df = pd.read_csv(file_path, parse_dates=["Date"])
-    df.sort_values("Date", inplace=True)
+    if "Date" not in df.columns or "Close" not in df.columns:
+        raise ValueError(f"Required columns missing in data for {ticker}")
+
+    df = df.sort_values("Date").copy()
     df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
-    df = df.dropna(subset=["Close"])
+    df = df.dropna(subset=["Close"]).copy()
     df = df[-lookback:]
 
     highs_idx = argrelextrema(df["Close"].values, np.greater_equal, order=window)[0]
@@ -34,7 +39,6 @@ def detect_triangle_patterns(ticker, window=5, lookback=60):
     lows = df.iloc[lows_idx]
 
     log.debug(f"Highs: {len(highs)} | Lows: {len(lows)}")
-
 
     if len(highs) < 3 or len(lows) < 3:
         return []

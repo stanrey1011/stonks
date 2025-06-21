@@ -13,3 +13,12 @@ project/data/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/

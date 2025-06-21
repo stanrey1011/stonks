@@ -17,15 +17,20 @@ def fit_trendline(points):
     model = LinearRegression().fit(x, y)
     return model.coef_[0][0], model.intercept_[0]  # slope, intercept
 
-def detect_wedge_patterns(ticker, window=5, lookback=60):
-    file_path = os.path.join(DATA_DIR, f"{ticker}.csv")
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"No data for {ticker}")
+def detect_wedge_patterns(ticker, window=5, lookback=60, df=None):
+    if df is None:
+        file_path = os.path.join(DATA_DIR, f"{ticker}.csv")
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"No data for {ticker}")
+        df = pd.read_csv(file_path, parse_dates=["Date"])
+        print(f"[DEBUG] Loaded {ticker}: {df.columns}")
 
-    df = pd.read_csv(file_path, parse_dates=["Date"])
-    df.sort_values("Date", inplace=True)
+    if "Date" not in df.columns or "Close" not in df.columns:
+        raise ValueError(f"Required columns missing in data for {ticker}")
+
+    df = df.sort_values("Date").copy()
     df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
-    df = df.dropna(subset=["Close"])
+    df = df.dropna(subset=["Close"]).copy()
     df = df[-lookback:]
 
     highs_idx = argrelextrema(df["Close"].values, np.greater_equal, order=window)[0]
@@ -45,19 +50,15 @@ def detect_wedge_patterns(ticker, window=5, lookback=60):
     log.debug(f"upper_slope={upper_slope:.4f}, lower_slope={lower_slope:.4f}")
 
     pattern = None
-    # Falling wedge: both slopes negative, upper slope steeper (more negative)
     if upper_slope < 0 and lower_slope < 0 and abs(upper_slope) > abs(lower_slope):
         pattern = "Falling Wedge"
-
-    # Rising wedge: both slopes positive, lower slope steeper
     elif upper_slope > 0 and lower_slope > 0 and abs(lower_slope) > abs(upper_slope):
         pattern = "Rising Wedge"
 
     if pattern:
         slope_diff = abs((upper_slope or 0) - (lower_slope or 0))
-        confidence = max(0, round(1.0 - min(slope_diff * 0.5, 1.0), 2))  # reduce scale multiplier
-        #confidence = max(0, round(1.0 - min(slope_diff * 2, 1.0), 2))  # Less aggressive penalty
-        if confidence >= 0.2:  # Accept lower confidence
+        confidence = max(0, round(1.0 - min(slope_diff * 0.5, 1.0), 2))
+        if confidence >= 0.2:
             start_date = df.iloc[min(highs_idx[0], lows_idx[0])]["Date"]
             end_date = df.iloc[max(highs_idx[-1], lows_idx[-1])]["Date"]
             return [(start_date, end_date, pattern, confidence)]
@@ -66,7 +67,7 @@ def detect_wedge_patterns(ticker, window=5, lookback=60):
 
 if __name__ == "__main__":
     ticker = "SPY"
-    results = detect_wedges(ticker, lookback=120)
+    results = detect_wedge_patterns(ticker, lookback=120)
     if results:
         print(f"[{ticker}] Wedge Patterns:")
         for s, e, t, c in results:
