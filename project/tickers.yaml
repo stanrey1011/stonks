@@ -1,0 +1,19 @@
+tickers:
+  - AAPL
+  - MSFT
+  - GOOGL
+  - TSLA
+  - AMZN
+  - SPY
+  - QQQ
+  - VTI
+  - T
+#  - ARM
+#  - AMD
+  - NVDA
+#  - XOM
+#  - PLTR
+  - GLD
+  - FBTC
+  - INTC
+#  - RH

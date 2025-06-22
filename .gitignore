@@ -8,7 +8,7 @@ __pycache__/
 venv/
 
 # Data
-project/data/
+data/
 
 # OS-specific
 .DS_Store
@@ -22,3 +22,7 @@ Thumbs.db
 
 # PyCharm
 .idea/
+
+# Others
+build/
+dist/

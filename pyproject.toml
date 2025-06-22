@@ -1,3 +1,6 @@
+# pyproject.toml for stonks CLI – modern Python packaging
+# Recommended PEP 621 format, compatible with pip ≥ 21 and modern tools (e.g., Poetry, Hatch)
+
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -5,10 +8,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stonks"
 version = "0.1.0"
-description = "CLI for stock pattern detection"
+description = "CLI tool for stock pattern detection"
 authors = [{ name = "Your Name", email = "your@email.com" }]
-readme = "readme.txt"
+readme = "README.md"
 requires-python = ">=3.8"
+license = "MIT"
+keywords = ["stocks", "trading", "chart patterns", "cli"]
 dependencies = [
     "click",
     "pandas",
@@ -18,4 +23,8 @@ dependencies = [
 ]
 
 [project.scripts]
-stonks = "project.stonks_cli:cli"
+stonks = "stonkslib.stonks_cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stonkslib*"]
