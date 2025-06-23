@@ -1,50 +1,48 @@
 import os
 import click
-from stonkslib.utils.fetch_ranges import fetch_all
-from stonkslib.patterns.historical_pattern_analysis import main as anal_main
-from stonkslib.check_data_span import main as check_span
+import yaml
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from stonkslib.fetch.ranges import fetch_all
+from stonkslib.utils.load_td import load_td
+#from stonkslib.patterns.find_patterns import find_patterns
+from stonkslib.alerts.trade_alerts import trigger_alerts  # Optional, if using alerts
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TICKER_YAML = os.path.join(BASE_DIR, "tickers.yaml")
+
+def load_tickers(yaml_file=TICKER_YAML):
+    with open(yaml_file, "r") as f:
+        data = yaml.safe_load(f)
+    return data['stocks'] + data['crypto'] + data['etfs']
 
 @click.group()
 def cli():
-    """Stonks CLI tool"""
+    """Stonks CLI"""
     pass
 
 @cli.command(name="fetch")
-def fetch_cmd():
-    """Fetch all tickers from tickers.yaml (default range: 1y)"""
-    fetch_all()
+@click.option("--force", is_flag=True, help="Force re-download and overwrite existing CSVs")
+def fetch_cmd(force):
+    """Fetch all data for all tickers with predefined intervals"""
+    fetch_all(force=force)
 
 @cli.command(name="anal")
-def analyze():
-    """Run historical pattern analysis"""
-    anal_main()
+def anal_cmd():
+    """Analyze historical patterns and print alerts"""
+    tickers = load_tickers()
+    intervals = ["1d", "1wk"]
+    alerts = []
 
-@cli.command(name="span")
-def span():
-    """Check available data span for each ticker"""
-    check_span()
+    for ticker in tickers:
+        for interval in intervals:
+            data = load_ticker_data(ticker, base_dir="data/ticker_data", interval=interval)
+            if data is not None and not data.empty:
+                patterns = find_patterns(data, [interval])
+                for p in patterns:
+                    alerts.append(f"Alert for {ticker} ({interval}): {p['pattern_type']} detected!")
 
-@cli.command(name="wipe-imports")
-def wipe_imports():
-    """Delete all fetched CSVs (except historical analysis output)"""
-    data_dir = os.path.join(BASE_DIR, "..", "data")
-    for root, _, files in os.walk(data_dir):
-        for file in files:
-            if file.endswith(".csv") and file != "historical_pattern_analysis.csv":
-                os.remove(os.path.join(root, file))
-    click.echo("🧹 Wiped imported CSVs.")
-
-@cli.command(name="wipe-anal")
-def wipe_analysis():
-    """Delete the historical analysis CSV file"""
-    analysis_path = os.path.join(BASE_DIR, "..", "data", "ticker_data", "historical_pattern_analysis.csv")
-    if os.path.exists(analysis_path):
-        os.remove(analysis_path)
-        click.echo("🧽 Wiped analysis file.")
+    if alerts:
+        for alert in alerts:
+            print(alert)
     else:
-        click.echo("⚠ No analysis file found.")
-
-if __name__ == "__main__":
-    cli()
+        print("No patterns detected.")

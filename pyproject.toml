@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonks"
-version = "0.1.0"
+version = "0.1.1"
 description = "CLI tool for stock pattern detection"
 authors = [{ name = "Your Name", email = "your@email.com" }]
 readme = "README.md"

@@ -23,7 +23,7 @@ def load_tickers():
         data = yaml.safe_load(f)
     return [ticker for group in data.values() for ticker in group]
 
-def scan_ticker(ticker, interval="1d"):
+def scan_ticker(ticker, interval="1w"):
     try:
         df = load_ticker_data(ticker, interval=interval)
     except Exception as e:
@@ -39,7 +39,7 @@ def scan_ticker(ticker, interval="1d"):
 
     return patterns
 
-def main(interval="1d"):
+def main(interval="1w"):
     tickers = load_tickers()
     any_found = False
 

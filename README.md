@@ -13,6 +13,14 @@ find stonkslib -type f -name "*.py" -exec sed -i 's/from project\./from stonksli
 find stonkslib -type f -name "*.py" -exec sed -i 's/import project\./import stonkslib./g' {} +
 sed -i 's/detect_func/find_func/g' ../stonkslib/patterns/pattern_score.py
 
+zip -r stonks_clean.zip stonks \
+  -x "stonks/venv/*" \
+  -x "stonks/__pycache__/*" \
+  -x "stonks/*.egg-info/*" \
+  -x "stonks/**/*.pyc" \
+  -x "stonks/.git/*" \
+  -x "stonks/dev/*" \
+  -x "stonks/data/ticker_data/*"
 
 
 New Folder Structure (restructure.py)

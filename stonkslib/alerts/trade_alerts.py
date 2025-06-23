@@ -1,6 +1,4 @@
 import logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
 import os
 import yaml
 from stonkslib.indicators.macd import calculate_macd
@@ -8,77 +6,88 @@ from stonkslib.indicators.rsi import calculate_rsi
 from stonkslib.indicators.obv import calculate_obv
 from stonkslib.indicators.bollinger import calculate_bollinger_bands
 
+# Set up logging for alerts
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# Path to the tickers.yaml file
 TICKER_YAML = os.path.join(os.path.dirname(__file__), "..", "data_collection", "tickers.yaml")
 
 def load_tickers(path=TICKER_YAML):
+    """Load tickers from the YAML file (stocks, crypto, ETFs)"""
     with open(path, "r") as f:
         tickers_config = yaml.safe_load(f)
     return tickers_config["stocks"] + tickers_config["crypto"] + tickers_config["etfs"]
 
 def score_macd(df):
+    """Score MACD indicator to generate a signal"""
     if df["MACD"].iloc[-1] > df["Signal_Line"].iloc[-1]:
-        return 20
+        return 20  # Buy signal
     elif df["MACD"].iloc[-1] < df["Signal_Line"].iloc[-1]:
-        return -20
-    return 0
+        return -20  # Sell signal
+    else:
+        return 0  # Neutral signal
 
 def score_rsi(df):
-    rsi = df["RSI"].iloc[-1]
-    if rsi < 30:
-        return 15
-    elif rsi > 70:
-        return -15
-    return 0
+    """Score RSI indicator to generate a signal"""
+    if df["RSI"].iloc[-1] > 70:
+        return -20  # Sell signal (overbought)
+    elif df["RSI"].iloc[-1] < 30:
+        return 20  # Buy signal (oversold)
+    else:
+        return 0  # Neutral signal
 
 def score_obv(df):
-    price_diff = df["Close"].diff().iloc[-1]
-    obv_diff = df["OBV"].diff().iloc[-1]
-    if price_diff > 0 and obv_diff > 0:
-        return 15
-    elif price_diff > 0 and obv_diff < 0:
-        return -15
-    return 0
+    """Score OBV indicator to generate a signal"""
+    if df["OBV"].iloc[-1] > df["OBV"].iloc[-2]:
+        return 20  # Buy signal (rising OBV)
+    elif df["OBV"].iloc[-1] < df["OBV"].iloc[-2]:
+        return -20  # Sell signal (falling OBV)
+    else:
+        return 0  # Neutral signal
 
 def score_bollinger(df):
-    close = df["Close"].iloc[-1]
-    upper = df["Upper_Band"].iloc[-1]
-    lower = df["Lower_Band"].iloc[-1]
-    if close < lower:
-        return +10
-    elif close > upper:
-        return -10
-    return 0
+    """Score Bollinger Bands to generate a signal"""
+    if df["Close"].iloc[-1] > df["Upper_Band"].iloc[-1]:
+        return -20  # Sell signal (price above upper band)
+    elif df["Close"].iloc[-1] < df["Lower_Band"].iloc[-1]:
+        return 20  # Buy signal (price below lower band)
+    else:
+        return 0  # Neutral signal
 
-def analyze_ticker(ticker):
-    try:
-        macd_df = calculate_macd(ticker)
-        rsi_df = calculate_rsi(ticker)
-        obv_df = calculate_obv(ticker)
-        bb_df = calculate_bollinger_bands(ticker)
+def analyze_ticker(ticker, df):
+    """Analyze the indicators and trigger alerts if necessary"""
+    macd_score = score_macd(df)
+    rsi_score = score_rsi(df)
+    obv_score = score_obv(df)
+    bollinger_score = score_bollinger(df)
+    
+    # Combine all scores to determine final action
+    total_score = macd_score + rsi_score + obv_score + bollinger_score
+    
+    # Trigger alert based on the score
+    if total_score >= 40:
+        trigger_alerts(f"Strong Buy Signal for {ticker}")
+    elif total_score <= -40:
+        trigger_alerts(f"Strong Sell Signal for {ticker}")
+    elif total_score > 20:
+        trigger_alerts(f"Moderate Buy Signal for {ticker}")
+    elif total_score < -20:
+        trigger_alerts(f"Moderate Sell Signal for {ticker}")
+    else:
+        trigger_alerts(f"No significant action for {ticker}")
 
-        # Merge all latest values into one row (assumes same length)
-        score = 0
-        score += score_macd(macd_df)
-        score += score_rsi(rsi_df)
-        score += score_obv(obv_df)
-        score += score_bollinger(bb_df)
-
-        if score >= 30:
-            signal = "BUY"
-        elif score <= -30:
-            signal = "SELL"
-        else:
-            signal = "HOLD"
-
-        logging.info(f"[{ticker}] Score: {score:>3} → Signal: {signal}")
-    except Exception as e:
-        logging.info(f"[!] Failed to analyze {ticker}: {e}")
+def trigger_alerts(message):
+    """Triggers an alert by logging the message (can be extended to email/SMS)"""
+    logging.info(f"ALERT: {message}")
 
 def main():
-    tickers = load_tickers()
-    print("\n📈 Trade Alerts\n" + "-"*40)
+    """Main function to run the analysis on all tickers"""
+    tickers = load_tickers()  # Load all tickers (stocks, crypto, ETFs)
+    
+    # Example: loop through each ticker, load its data, and analyze
     for ticker in tickers:
-        analyze_ticker(ticker)
+        df = load_ticker_data(ticker)  # Assuming this function is defined elsewhere
+        analyze_ticker(ticker, df)  # Analyze the ticker and trigger alerts
 
 if __name__ == "__main__":
     main()
