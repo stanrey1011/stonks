@@ -1,31 +1,30 @@
 import logging
+import pandas as pd
+import warnings
+from stonkslib.utils.load_td import load_td  # Using load_td to load data
+
+# Suppress the specific UserWarning related to date format inference
+warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
+
+# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-import os
-import pandas as pd
-
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ticker_data")
-
-def calculate_rsi(ticker, period=14):
+def rsi(ticker, interval, period=14, lookback=60):
     """
-    Calculate RSI (Relative Strength Index) for a given ticker.
+    Calculate RSI (Relative Strength Index) for a given ticker using data loaded via load_td.
 
     Parameters:
         ticker (str): Ticker symbol matching the CSV filename.
+        interval (str): Time interval (e.g., '1d', '1m', etc.)
         period (int): Number of periods to use for RSI calculation (default 14).
+        lookback (int): Number of rows to load (default 60).
 
     Returns:
         pd.DataFrame: Original DataFrame with added 'RSI' column.
     """
-    file_path = os.path.join(DATA_DIR, f"{ticker}.csv")
+    df = load_td(ticker, interval, lookback=lookback)  # Load data using load_td
 
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"CSV for ticker '{ticker}' not found at {file_path}")
-
-    df = pd.read_csv(file_path, parse_dates=["Date"])
-    df.sort_values("Date", inplace=True)
-
-    # Ensure 'Close' is numeric
+    # Convert Close to numeric (in case there are any non-numeric values)
     df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
     df = df.dropna(subset=["Close"])
 
@@ -47,7 +46,10 @@ def calculate_rsi(ticker, period=14):
     return df
 
 if __name__ == "__main__":
-    # Test the RSI function
     ticker = "AAPL"
-    rsi_df = calculate_rsi(ticker)
-    print(rsi_df.tail(10)[["Date", "Close", "RSI"]])
+    interval = "1d"  # Ensure this is a string
+    lookback = 60  # Default lookback
+    rsi_df = rsi(ticker, interval, lookback=lookback)
+
+    # Print the last 10 rows with relevant columns, no need for 'Date' as a column
+    print(rsi_df.tail(10)[["Close", "RSI"]])

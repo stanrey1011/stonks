@@ -1,28 +1,32 @@
 import logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
-import os
 import pandas as pd
 import numpy as np
+import warnings
+from stonkslib.utils.load_td import load_td  # Using load_td to load data
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ticker_data")
+# Suppress the specific UserWarning related to date format inference
+warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
 
-def calculate_obv(ticker):
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+def obv(ticker, interval, lookback=60):
     """
-    Calculate On-Balance Volume (OBV) for a given ticker.
+    Calculate On-Balance Volume (OBV) for a given ticker using data loaded via load_td.
 
     Parameters:
         ticker (str): Ticker symbol (must match CSV filename)
+        interval (str): Time interval (e.g., '1d', '1m', etc.)
+        lookback (int): Number of rows to load (default 60)
 
     Returns:
         pd.DataFrame: DataFrame with added 'OBV' column
     """
-    file_path = os.path.join(DATA_DIR, f"{ticker}.csv")
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"CSV file for ticker '{ticker}' not found at {file_path}")
+    # Ensure interval is a string
+    if not isinstance(interval, str):
+        raise ValueError(f"Expected 'interval' to be a string, but got {type(interval)}")
 
-    df = pd.read_csv(file_path, parse_dates=["Date"])
-    df.sort_values("Date", inplace=True)
+    df = load_td(ticker, interval, lookback=lookback)  # Load data using load_td
 
     df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
     df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce")
@@ -38,5 +42,9 @@ def calculate_obv(ticker):
 
 if __name__ == "__main__":
     ticker = "AAPL"
-    obv_df = calculate_obv(ticker)
-    print(obv_df.tail(10)[["Date", "Close", "Volume", "OBV"]])
+    interval = "1d"  # Ensure this is a string
+    lookback = 60  # Default lookback
+    obv_df = obv(ticker, interval, lookback=lookback)
+
+    # Print the last 10 rows with relevant columns
+    print(obv_df.tail(10)[["Close", "Volume", "OBV"]])
