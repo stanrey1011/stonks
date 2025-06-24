@@ -49,6 +49,8 @@ def fetch_all(yaml_file="tickers.yaml", data_dir="data", force=False):
 
                 print(f"[↑] Fetching {ticker} ({interval_str}, {period})...")
                 try:
+                    # Patch for Yahoo interval naming (e.g. 1h → 60m)
+                    yf_interval = {"1h": "60m"}.get(interval_str, interval_str)
                     df = yf.download(ticker, interval=interval_str, period=period, progress=False)
                     if not df.empty:
                         df.index.name = "Date"

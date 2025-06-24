@@ -7,17 +7,22 @@ def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
         df.reset_index(inplace=True)
 
     # Coerce date parsing from the first column
-    df[df.columns[0]] = pd.to_datetime(df[df.columns[0]], format="%Y-%m-%d", errors='coerce')
+    df[df.columns[0]] = pd.to_datetime(df[df.columns[0]], errors='coerce')
 
     # Drop rows with invalid dates
     df.dropna(subset=[df.columns[0]], inplace=True)
+
+    # --- Early exit if DataFrame is empty now ---
+    if df.empty:
+        print("Warning: DataFrame is empty after removing invalid dates.")
+        return df
 
     # Rename the date column to "Date" and set it as index
     df.rename(columns={df.columns[0]: "Date"}, inplace=True)
     df.set_index("Date", inplace=True)
 
     # Drop the first row if it contains column headers repeated as data
-    if df.index[0] == "Ticker" or df.index[0] == "Date":
+    if str(df.index[0]).lower() in ("ticker", "date"):
         df = df.iloc[1:]
 
     # Drop duplicate columns like ('Close', 'AAPL'), etc.
@@ -30,7 +35,8 @@ def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 if __name__ == "__main__":
     path = Path("data/ticker_data/clean/1d/MSFT.csv")
-    df = pd.read_csv(path, index_col=0, parse_dates=[0], date_format="%Y-%m-%d")
+    # Remove date_format, use parse_dates and index_col
+    df = pd.read_csv(path, index_col=0, parse_dates=[0])
 
     df_cleaned = clean_columns(df)
     print(df_cleaned.head())

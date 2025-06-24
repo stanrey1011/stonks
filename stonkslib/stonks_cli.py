@@ -34,9 +34,8 @@ def fetch_cmd(force):
     fetch_all(force=force)
 
 @cli.command(name="clean")
-@click.option("--lookback", default=None, type=int, help="Optional: Number of rows to keep (default varies by interval)")
 @click.option("--force", is_flag=True, help="Force overwrite existing clean files")
-def clean_cmd(lookback, force):
+def clean_cmd(force):
     """Clean and standardize raw CSVs into clean directory"""
     tickers = load_tickers()
     intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
@@ -44,7 +43,7 @@ def clean_cmd(lookback, force):
     for ticker in tickers:
         for interval in intervals:
             try:
-                df = clean_td(ticker, interval, lookback=lookback, force=force)
+                df = clean_td(ticker, interval, force=force)
                 if df is not None:
                     print(f"[✓] Cleaned {ticker} ({interval}) — {len(df)} rows")
             except Exception as e:

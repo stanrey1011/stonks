@@ -3,50 +3,51 @@
 import os
 import pandas as pd
 
-# Base directory for locating data folders
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-def clean_td(ticker, interval, lookback=None, force=False, base_dir=BASE_DIR):
-    """
-    Load, clean, and return raw ticker data.
-    Saves cleaned data to the appropriate location under `clean/`.
+COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
 
-    Parameters:
-        ticker (str): Ticker symbol (e.g. "AAPL")
-        interval (str): Time interval (e.g. "1d", "1h")
-        lookback (int): Number of recent rows to retain (optional)
-        force (bool): Whether to overwrite existing clean files
-        base_dir (str): Project base directory
-
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
+def clean_td(ticker, interval, base_dir=BASE_DIR, force=False, verbose=True):
     raw_path = os.path.join(base_dir, "data", "ticker_data", "raw", interval, f"{ticker}.csv")
     clean_path = os.path.join(base_dir, "data", "ticker_data", "clean", interval, f"{ticker}.csv")
 
     if not os.path.exists(raw_path):
-        print(f"[!] No raw data found for {ticker} ({interval})")
-        return
+        if verbose:
+            print(f"[!] No raw data for {ticker} ({interval})")
+        return None
 
     try:
-        df = pd.read_csv(raw_path, index_col=0)
-        df.index = pd.to_datetime(df.index, utc=True, errors="coerce")
-        df = df[df.index.notna()]
-        df = df.sort_index()
+        # Try loading with possible extra rows skipped
+        df = pd.read_csv(raw_path, dtype=str)
+        # Remove rows where the first column is not a date
+        df = df[df[df.columns[0]].str.match(r"\d{4}-\d{2}-\d{2}")]
 
-        if lookback:
-            df = df.tail(lookback)
+        # Parse the date column, drop unparseable
+        df[df.columns[0]] = pd.to_datetime(df[df.columns[0]], errors='coerce', utc=True)
+        df.dropna(subset=[df.columns[0]], inplace=True)
+        df.rename(columns={df.columns[0]: "Date"}, inplace=True)
+        df.set_index("Date", inplace=True)
 
-        # Ensure index is named "Date" instead of default "Price"
-        df.index.name = "Date"
+        # Now keep only real numeric columns (float conversion or drop non-numeric)
+        COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
+        df = df[COLUMNS].apply(pd.to_numeric, errors="coerce")
 
-        if not force and os.path.exists(clean_path):
-            print(f"[⏭] Clean data already exists for {ticker} ({interval}) — skipping")
-            return
+        # Drop rows with any NaN in price columns
+        df.dropna(subset=COLUMNS, inplace=True)
+
+        # Final sanity check
+        if df.empty or df.index[0].year < 1980:
+            print(f"[!] Data looks wrong after cleaning {ticker} ({interval})—please check your raw file!")
+            return None
 
         os.makedirs(os.path.dirname(clean_path), exist_ok=True)
-        df.to_csv(clean_path)
+        if force or not os.path.exists(clean_path):
+            df.to_csv(clean_path)
+            if verbose:
+                print(f"[✔] Cleaned data written: {clean_path}")
+
         return df
 
     except Exception as e:
-        print(f"[!] Failed to clean {ticker} ({interval}): {e}")
+        print(f"[!] Cleaning failed for {ticker} ({interval}): {e}")
+        return None

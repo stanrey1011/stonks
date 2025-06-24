@@ -2,39 +2,30 @@
 
 import logging
 import pandas as pd
-from stonkslib.utils.load_td import load_td
 import warnings
 
 # Suppress date format warnings
 warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
 
-# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-
-# More sensitive - tighter bands and frequent
-#bb_df = bollinger_bands("AAPL", "1d", window=10, num_std_dev=1.5)
-
-# More strict - wider bands and less frequent
-#bb_df = bollinger_bands("AAPL", "1d", window=30, num_std_dev=2.5)
-
-def bollinger_bands(ticker, interval, window=20, num_std_dev=2):
+def bollinger_bands(df, window=20, num_std_dev=2):
     """
-    Calculate Bollinger Bands for a given ticker using clean data.
+    Calculate Bollinger Bands for a given DataFrame (expects 'Close' column).
+    Returns a new DataFrame with columns: 'MA', 'STD', 'Upper_Band', 'Lower_Band'.
     """
-    df_dict = load_td([ticker], interval)
-    df = df_dict[ticker]
-
-    df["MA"] = df["Close"].rolling(window=window).mean()
-    df["STD"] = df["Close"].rolling(window=window).std()
-    df["Upper_Band"] = df["MA"] + (num_std_dev * df["STD"])
-    df["Lower_Band"] = df["MA"] - (num_std_dev * df["STD"])
-
-    return df
+    result = pd.DataFrame(index=df.index)
+    result["MA"] = df["Close"].rolling(window=window).mean()
+    result["STD"] = df["Close"].rolling(window=window).std()
+    result["Upper_Band"] = result["MA"] + (num_std_dev * result["STD"])
+    result["Lower_Band"] = result["MA"] - (num_std_dev * result["STD"])
+    result["Close"] = df["Close"]
+    return result
 
 def generate_bollinger_signals(df):
     """
     Add breakout signal column and log detections.
+    Returns a DataFrame with non-empty signals only.
     """
     signals = []
 
@@ -53,17 +44,19 @@ def generate_bollinger_signals(df):
         if signal:
             logging.info(f"[{curr.name}] {signal} — Close: {curr['Close']:.2f}")
 
-    df = df.iloc[1:].copy()
-    df["Signal"] = signals
-    return df[df["Signal"] != ""]
+    df_signals = df.iloc[1:].copy()
+    df_signals["Signal"] = signals
+    return df_signals[df_signals["Signal"] != ""]
 
 # 🔬 Manual test
 if __name__ == "__main__":
+    from stonkslib.utils.load_td import load_td
     ticker = "AAPL"
     interval = "1d"
-    bb_df = bollinger_bands(ticker, interval)
+    df = load_td([ticker], interval)[ticker]
+    bb_df = bollinger_bands(df)
 
-    # Drop rows with any missing values in the indicator columns
+    # Drop rows with missing values in indicator columns
     bb_df = bb_df.dropna(subset=["Upper_Band", "Lower_Band", "MA", "Close"])
 
     if bb_df.empty:

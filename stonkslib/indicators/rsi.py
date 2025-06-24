@@ -3,7 +3,6 @@
 import logging
 import pandas as pd
 import warnings
-from stonkslib.utils.load_td import load_td
 
 # Suppress format warnings
 warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
@@ -11,25 +10,12 @@ warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-# RSI Sensitivity Adjustments
-# (period=7)     # More sensitive, short-term RSI
-# (period=21)    # Smoother, long-term RSI
-
-def rsi(ticker, interval, period=14):
+def rsi(df, period=14):
     """
-    Calculate RSI (Relative Strength Index) for a given ticker using clean data.
-
-    Parameters:
-        ticker (str): Ticker symbol
-        interval (str): Time interval (e.g., '1d')
-        period (int): RSI period (default 14)
-
-    Returns:
-        pd.DataFrame: DataFrame with 'RSI' column added
+    Calculate RSI (Relative Strength Index) for a DataFrame (expects 'Close' column).
+    Returns a pandas Series with the RSI values.
     """
-    df_dict = load_td([ticker], interval)
-    df = df_dict[ticker]
-
+    df = df.copy()
     df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
     df = df.dropna(subset=["Close"])
 
@@ -37,29 +23,35 @@ def rsi(ticker, interval, period=14):
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
 
-    avg_gain = gain.rolling(window=period).mean()
-    avg_loss = loss.rolling(window=period).mean()
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
 
     rs = avg_gain / avg_loss
-    df["RSI"] = 100 - (100 / (1 + rs))
+    rsi_series = 100 - (100 / (1 + rs))
 
-    return df
+    # To ensure alignment with the input df's index:
+    rsi_series = rsi_series.reindex(df.index)
 
+    return rsi_series
 
-# Example usage
+# Manual test
 if __name__ == "__main__":
+    from stonkslib.utils.load_td import load_td
     ticker = "AAPL"
     interval = "1d"
 
-    rsi_df = rsi(ticker, interval)
+    df = load_td([ticker], interval)[ticker]
+    rsi_series = rsi(df, period=14)
 
-    rsi_df = rsi_df.dropna(subset=["RSI"])
+    df["RSI"] = rsi_series
+    rsi_df = df.dropna(subset=["RSI"])
+
     if rsi_df.empty:
         print(f"[!] Not enough data to compute RSI for {ticker} ({interval})")
     else:
         latest = rsi_df.iloc[-1]
         direction = "🔼 Overbought" if latest["RSI"] > 70 else (
                     "🔽 Oversold" if latest["RSI"] < 30 else "➡️ Neutral")
-        
+
         print(rsi_df.tail(10)[["Close", "RSI"]])
         print(f"\n{direction} — Latest RSI: {latest['RSI']:.2f}")
