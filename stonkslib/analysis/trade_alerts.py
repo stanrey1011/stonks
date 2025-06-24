@@ -1,126 +1,96 @@
-import logging
 import os
+import pandas as pd
+import logging
+import warnings
 import yaml
+
+from stonkslib.utils.load_td import load_td
 from stonkslib.indicators.bollinger import bollinger_bands
 from stonkslib.indicators.macd import macd
-from stonkslib.indicators.rsi import rsi
 from stonkslib.indicators.obv import obv
-from stonkslib.patterns.doubles import find_doubles
-from stonkslib.patterns.head_shoulders import find_head_shoulders
-from stonkslib.patterns.triangles import find_triangles
-from stonkslib.patterns.wedges import find_wedges
-from stonkslib.utils.load_td import load_td
+from stonkslib.indicators.rsi import rsi
 
-# Set up logging for alerts
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-logging.getLogger().addHandler(console_handler)
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
 
-# Path to the tickers.yaml file
-TICKER_YAML = os.path.join(os.path.dirname(__file__), "..", "..", "tickers.yaml")  # Relative path
+# Suppress specific warnings
+warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
 
-def load_tickers(path=TICKER_YAML):
-    """Load tickers from the YAML file (stocks, crypto, ETFs)"""
-    with open(path, "r") as f:
-        tickers_config = yaml.safe_load(f)
-    tickers = tickers_config["stocks"] + tickers_config["crypto"] + tickers_config["etfs"]
-    logging.info(f"Loaded tickers: {tickers}")
-    return tickers
-
+# ---- Indicator scoring functions ----
 def score_macd(df):
-    """Score MACD indicator to generate a signal"""
-    if df["MACD"].iloc[-1] > df["Signal_Line"].iloc[-1]:
-        return 20  # Buy signal
-    elif df["MACD"].iloc[-1] < df["Signal_Line"].iloc[-1]:
-        return -20  # Sell signal
-    else:
-        return 0  # Neutral signal
+    if "MACD" not in df.columns or "Signal_Line" not in df.columns:
+        df = macd(df)
+    if "MACD" in df.columns and "Signal_Line" in df.columns:
+        return int(df["MACD"].iloc[-1] > df["Signal_Line"].iloc[-1])
+    return 0
 
-def score_rsi(df):
-    """Score RSI indicator to generate a signal"""
-    if df["RSI"].iloc[-1] > 70:
-        return -20  # Sell signal (overbought)
-    elif df["RSI"].iloc[-1] < 30:
-        return 20  # Buy signal (oversold)
-    else:
-        return 0  # Neutral signal
+def score_rsi(df, interval, lower=30, upper=70):
+    if "RSI" not in df.columns:
+        df = rsi(df, interval)
+    if "RSI" in df.columns:
+        rsi_val = df["RSI"].iloc[-1]
+        return int(rsi_val < lower or rsi_val > upper)
+    return 0
 
 def score_obv(df):
-    """Score OBV indicator to generate a signal"""
-    if df["OBV"].iloc[-1] > df["OBV"].iloc[-2]:
-        return 20  # Buy signal (rising OBV)
-    elif df["OBV"].iloc[-1] < df["OBV"].iloc[-2]:
-        return -20  # Sell signal (falling OBV)
-    else:
-        return 0  # Neutral signal
+    if "OBV" not in df.columns:
+        df = obv(df)
+    return 1 if "OBV" in df.columns else 0
 
 def score_bollinger(df):
-    """Score Bollinger Bands to generate a signal"""
-    if df["Close"].iloc[-1] > df["Upper_Band"].iloc[-1]:
-        return -20  # Sell signal (price above upper band)
-    elif df["Close"].iloc[-1] < df["Lower_Band"].iloc[-1]:
-        return 20  # Buy signal (price below lower band)
-    else:
-        return 0  # Neutral signal
+    if "Upper_Band" not in df.columns or "Lower_Band" not in df.columns:
+        df = bollinger_bands(df)
+    if "Upper_Band" in df.columns and "Lower_Band" in df.columns:
+        close = df["Close"].iloc[-1]
+        return int(close > df["Upper_Band"].iloc[-1] or close < df["Lower_Band"].iloc[-1])
+    return 0
 
-def analyze_ticker(ticker, df):
-    """Analyze the indicators and patterns, and trigger alerts if necessary"""
-    
-    # Debug: Check columns of the dataframe
-    logging.debug(f"Columns in dataframe for {ticker}: {df.columns}")
+# ---- Ticker loader ----
+def load_tickers():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.abspath(os.path.join(script_dir, "../../"))
+    ticker_path = os.path.join(root_dir, "tickers.yaml")
 
-    # Indicator scores
+    with open(ticker_path, "r") as f:
+        tickers_config = yaml.safe_load(f)
+
+    all_tickers = []
+    for category in tickers_config:
+        all_tickers.extend(tickers_config[category])
+
+    logger.info(f"Loaded tickers: {all_tickers}")
+    return all_tickers
+
+# ---- Analysis driver ----
+def analyze_ticker(ticker, df, interval):
     macd_score = score_macd(df)
-    rsi_score = score_rsi(df)
+    rsi_score = score_rsi(df, interval)
     obv_score = score_obv(df)
-    bollinger_score = score_bollinger(df)
-    
-    # Pattern scores
-    double_patterns = find_doubles(ticker, df)  # Use the pattern functions
-    head_shoulders = find_head_shoulders(ticker, df)
-    triangle_patterns = find_triangles(ticker, df)
-    wedge_patterns = find_wedges(ticker, df)
+    boll_score = score_bollinger(df)
 
-    # Combine all scores
-    total_score = macd_score + rsi_score + obv_score + bollinger_score
-    total_score += len(double_patterns) * 10  # Example: reward patterns
-    total_score += len(head_shoulders) * 10
-    total_score += len(triangle_patterns) * 10
-    total_score += len(wedge_patterns) * 10
+    total = macd_score + rsi_score + obv_score + boll_score
+    logger.info(f"{ticker} Score: {total} (MACD={macd_score}, RSI={rsi_score}, OBV={obv_score}, BB={boll_score})")
 
-    # Trigger alerts based on the combined score
-    if total_score >= 40:
-        trigger_alerts(f"Strong Buy Signal for {ticker}")
-    elif total_score <= -40:
-        trigger_alerts(f"Strong Sell Signal for {ticker}")
-    elif total_score > 20:
-        trigger_alerts(f"Moderate Buy Signal for {ticker}")
-    elif total_score < -20:
-        trigger_alerts(f"Moderate Sell Signal for {ticker}")
-    else:
-        trigger_alerts(f"No significant action for {ticker}")
+    if total >= 3:
+        logger.info(f"🚨 Alert: {ticker} shows strong signal!")
 
-    # Log the detected patterns for verification
-    logging.info(f"Patterns detected for {ticker}:")
-    logging.info(f"Doubles: {double_patterns}")
-    logging.info(f"Head & Shoulders: {head_shoulders}")
-    logging.info(f"Triangles: {triangle_patterns}")
-    logging.info(f"Wedges: {wedge_patterns}")
-
-def trigger_alerts(message):
-    """Triggers an alert by logging the message (can be extended to email/SMS)"""
-    logging.info(f"ALERT: {message}")
-
+# ---- Main entry ----
 def main():
-    """Main function to run the analysis on all tickers"""
-    tickers = load_tickers()  # Load all tickers (stocks, crypto, ETFs)
-    
-    # Example: loop through each ticker, load its data, and analyze
+    tickers = load_tickers()
+    interval = "1d"
+    lookback = 60
+
     for ticker in tickers:
-        logging.info(f"Analyzing {ticker}...")
-        df = load_td(ticker, interval="1d", lookback=60)  # Load ticker data (interval can be passed)
-        analyze_ticker(ticker, df)  # Analyze the ticker and trigger alerts
+        logger.info(f"Analyzing {ticker}...")
+        df = load_td(ticker, interval, lookback)
+        if df is not None:
+            analyze_ticker(ticker, df, interval)
+        else:
+            logger.warning(f"⚠️ No data for {ticker}")
 
 if __name__ == "__main__":
     main()

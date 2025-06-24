@@ -1,11 +1,18 @@
+# stonkslib/stonks_cli.py
+
 import os
 import click
 import yaml
+import warnings
 
-from stonkslib.fetch.ranges import fetch_all
+from stonkslib.fetch.data import fetch_all
+from stonkslib.utils.clean_td import clean_td
 from stonkslib.utils.load_td import load_td
-#from stonkslib.patterns.find_patterns import find_patterns
-from stonkslib.alerts.trade_alerts import trigger_alerts  # Optional, if using alerts
+from stonkslib.utils.wipe_raw_td import clear_raw_td
+from stonkslib.utils.wipe_clean_td import clear_clean_td
+
+# Suppress specific pandas date warnings
+warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TICKER_YAML = os.path.join(BASE_DIR, "tickers.yaml")
@@ -13,7 +20,7 @@ TICKER_YAML = os.path.join(BASE_DIR, "tickers.yaml")
 def load_tickers(yaml_file=TICKER_YAML):
     with open(yaml_file, "r") as f:
         data = yaml.safe_load(f)
-    return data['stocks'] + data['crypto'] + data['etfs']
+    return data.get("stocks", []) + data.get("crypto", []) + data.get("etfs", [])
 
 @click.group()
 def cli():
@@ -26,23 +33,31 @@ def fetch_cmd(force):
     """Fetch all data for all tickers with predefined intervals"""
     fetch_all(force=force)
 
-@cli.command(name="anal")
-def anal_cmd():
-    """Analyze historical patterns and print alerts"""
+@cli.command(name="clean")
+@click.option("--lookback", default=None, type=int, help="Optional: Number of rows to keep (default varies by interval)")
+@click.option("--force", is_flag=True, help="Force overwrite existing clean files")
+def clean_cmd(lookback, force):
+    """Clean and standardize raw CSVs into clean directory"""
     tickers = load_tickers()
-    intervals = ["1d", "1wk"]
-    alerts = []
+    intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
 
     for ticker in tickers:
         for interval in intervals:
-            data = load_ticker_data(ticker, base_dir="data/ticker_data", interval=interval)
-            if data is not None and not data.empty:
-                patterns = find_patterns(data, [interval])
-                for p in patterns:
-                    alerts.append(f"Alert for {ticker} ({interval}): {p['pattern_type']} detected!")
+            try:
+                df = clean_td(ticker, interval, lookback=lookback, force=force)
+                if df is not None:
+                    print(f"[✓] Cleaned {ticker} ({interval}) — {len(df)} rows")
+            except Exception as e:
+                print(f"[!] Failed to clean {ticker} ({interval}): {e}")
 
-    if alerts:
-        for alert in alerts:
-            print(alert)
-    else:
-        print("No patterns detected.")
+@cli.command(name="wipe")
+@click.option("--target", type=click.Choice(["raw", "clean", "all"]), default="raw", help="Target directory to wipe")
+def wipe_cmd(target):
+    """Wipe raw or clean ticker data folders"""
+    if target == "raw":
+        clear_raw_td()
+    elif target == "clean":
+        clear_clean_td()
+    elif target == "all":
+        clear_raw_td()
+        clear_clean_td()

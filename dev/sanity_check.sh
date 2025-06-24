@@ -1,7 +1,13 @@
 #!/bin/bash
 
 PATTERN_DIR="../stonkslib/patterns"
+INDICATOR_DIR="../stonkslib/indicators"
+UTILS_DIR="../stonkslib/utils"
+DATA_DIR="../data/ticker_data"
+DEV_DIR="../dev"
 DRY_RUN=false
+TEST_TICKER="AAPL"
+TEST_INTERVAL="1d"
 
 if [[ "$1" == "--dry-run" ]]; then
     DRY_RUN=true
@@ -21,7 +27,7 @@ fi
 echo "🔍 Checking each pattern module has a 'find_' function..."
 for file in "$PATTERN_DIR"/*.py; do
     filename=$(basename "$file")
-    
+
     if grep -q '@pattern_module: false' "$file"; then
         echo "🟡 Skipping $file (marked as non-pattern module)"
         continue
@@ -34,7 +40,7 @@ for file in "$PATTERN_DIR"/*.py; do
     fi
 done
 
-echo "🧪 Trying CLI import test: stonks --help"
+echo "🧪 Testing stonks CLI: stonks --help"
 if $DRY_RUN; then
     echo "💡 Skipping CLI load in dry-run mode"
 else
@@ -45,4 +51,30 @@ else
     fi
 fi
 
-echo "🧼 Sanity check complete."
+echo "📁 Checking required data files exist for $TEST_TICKER ($TEST_INTERVAL)..."
+RAW_FILE="$DATA_DIR/raw/$TEST_INTERVAL/$TEST_TICKER.csv"
+CLEAN_FILE="$DATA_DIR/clean/$TEST_INTERVAL/$TEST_TICKER.csv"
+
+[[ -f "$RAW_FILE" ]] && echo "✅ Raw file exists: $RAW_FILE" || echo "❌ Missing raw file: $RAW_FILE"
+[[ -f "$CLEAN_FILE" ]] && echo "✅ Clean file exists: $CLEAN_FILE" || echo "❌ Missing clean file: $CLEAN_FILE"
+
+if ! $DRY_RUN; then
+    echo "📊 Running indicator tests..."
+    for mod in bollinger obv macd; do
+        echo "🔧 Testing $mod.py..."
+        python3 -c "from stonkslib.indicators import $mod; print('✅ $mod imported')"
+    done
+
+    echo "📈 Testing pattern modules..."
+    for mod in doubles triangles wedges; do
+        echo "🔧 Testing $mod.py..."
+        python3 -c "from stonkslib.patterns import $mod; print('✅ $mod imported')"
+    done
+
+    echo "🧹 Testing clean/load helpers..."
+    python3 -c "from stonkslib.utils import clean_td, load_td; print('✅ clean_td/load_td imported')"
+else
+    echo "💡 Skipping indicator and pattern tests in dry-run mode"
+fi
+
+echo "✅ Sanity check complete."
