@@ -1,3 +1,5 @@
+# stonkslib/analysis/signals.py
+
 import logging
 import warnings
 import yaml
@@ -16,10 +18,10 @@ from stonkslib.patterns.head_shoulders import find_head_shoulders
 
 from stonkslib.utils.load_td import load_td
 
-# Suppress the specific UserWarning related to date format inference
+# Suppress specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
 
-# --- Setup logging to /stonks/log/build_db.log ---
+# --- Logging setup ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 LOG_DIR = os.path.join(PROJECT_ROOT, "log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -33,10 +35,10 @@ logging.basicConfig(
     ]
 )
 
-# Base directory for output
+# --- Paths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TICKER_YAML = os.path.join(BASE_DIR, "..", "tickers.yaml")
-BASE_ANALYSIS_DIR = os.path.join(BASE_DIR, "..", "data", "analysis")
+BASE_ANALYSIS_DIR = os.path.join(BASE_DIR, "..", "data", "analysis", "signals")
 
 def load_ticker_list(yaml_file=TICKER_YAML):
     with open(yaml_file, "r") as f:
@@ -51,83 +53,74 @@ def load_ticker_list(yaml_file=TICKER_YAML):
     return result
 
 def save_csv(df, ticker, interval, name):
+    if df is None or df.empty:
+        logging.warning(f"[!] Skipping save — empty DataFrame: {ticker} {interval} {name}")
+        return
     outdir = os.path.join(BASE_ANALYSIS_DIR, ticker, interval)
     os.makedirs(outdir, exist_ok=True)
-    outfile = os.path.join(outdir, f"{name}.csv")
-    df.to_csv(outfile)
-    return outfile
+    df.to_csv(os.path.join(outdir, f"{name}.csv"))
 
 def aggregate_and_save(ticker, interval):
     status = {}
 
-    # Load DataFrame once
     try:
         df = load_td([ticker], interval)[ticker]
-        #df = load_td(ticker, interval)
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Data load error: {e}")
         for key in ["rsi", "macd", "bollinger", "obv"]:
             status[key] = f"error: {e}"
         return status
 
-    # --- RSI Variations ---
+    # --- RSI ---
     try:
-        rsi_periods = [7, 14, 21]
         rsi_df = pd.DataFrame(index=df.index)
-        for period in rsi_periods:
-            rsi_df[f"RSI_{period}"] = rsi(df, period=period)
+        for p in [5, 7, 14]:
+            rsi_df[f"RSI_{p}"] = rsi(df, period=p)
         save_csv(rsi_df, ticker, interval, "rsi")
         status["rsi"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] RSI error: {e}")
         status["rsi"] = f"error: {e}"
 
-    # --- MACD Variations ---
+    # --- MACD ---
     try:
-        macd_params = [(12,26,9), (6,19,3), (5,35,5)]
         macd_df = pd.DataFrame(index=df.index)
-        for fast, slow, signal in macd_params:
-            macd_out = macd(df, short_window=fast, long_window=slow, signal_window=signal)
-            # Assumes macd() returns DataFrame with 'MACD' or similar column
-            macd_col = macd_out['MACD'] if 'MACD' in macd_out else macd_out.iloc[:,0]
-            macd_df[f"MACD_{fast}_{slow}_{signal}"] = macd_col
+        for fast, slow, sig in [(5, 13, 4), (6, 19, 3), (12, 26, 9)]:
+            out = macd(df.copy(), short_window=fast, long_window=slow, signal_window=sig)
+            macd_df[f"MACD_{fast}_{slow}_{sig}"] = out["MACD"]
         save_csv(macd_df, ticker, interval, "macd")
         status["macd"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] MACD error: {e}")
         status["macd"] = f"error: {e}"
 
-    # --- Bollinger Bands Variations ---
+    # --- Bollinger Bands ---
     try:
-        bb_params = [(20,2), (20,3), (50,2)]
         bb_df = pd.DataFrame(index=df.index)
-        for window, num_std in bb_params:
-            bands = bollinger_bands(df, window=window, num_std_dev=num_std)
-            bb_df[f"BB_upper_{window}_{num_std}"] = bands['Upper_Band']
-            bb_df[f"BB_lower_{window}_{num_std}"] = bands['Lower_Band']
+        for win, std in [(10, 1.5), (20, 2), (30, 2.5)]:
+            bands = bollinger_bands(df.copy(), window=win, num_std_dev=std)
+            bb_df[f"BB_upper_{win}_{std}"] = bands["Upper_Band"]
+            bb_df[f"BB_lower_{win}_{std}"] = bands["Lower_Band"]
         save_csv(bb_df, ticker, interval, "bollinger")
         status["bollinger"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Bollinger error: {e}")
         status["bollinger"] = f"error: {e}"
 
-    # --- OBV (no variations) ---
+    # --- OBV ---
     try:
-        obv_df = obv(df)
+        obv_df = obv(df.copy())
         save_csv(obv_df, ticker, interval, "obv")
         status["obv"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] OBV error: {e}")
         status["obv"] = f"error: {e}"
 
-    # --- Patterns (unchanged) ---
+    # --- Patterns ---
     try:
         doubles = find_doubles(ticker, interval)
-        if doubles:
-            doubles_df = pd.DataFrame(doubles, columns=["start", "end", "pattern", "confidence"])
-        else:
-            doubles_df = pd.DataFrame(columns=["start", "end", "pattern", "confidence"])
-        save_csv(doubles_df, ticker, interval, "doubles")
+        df_doubles = pd.DataFrame(doubles, columns=["start", "end", "pattern", "confidence"])
+        save_csv(df_doubles, ticker, interval, "doubles")
         status["doubles"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Doubles error: {e}")
@@ -135,11 +128,8 @@ def aggregate_and_save(ticker, interval):
 
     try:
         triangles = find_triangles(ticker, interval)
-        if triangles:
-            triangles_df = pd.DataFrame(triangles, columns=["start", "end", "pattern", "confidence"])
-        else:
-            triangles_df = pd.DataFrame(columns=["start", "end", "pattern", "confidence"])
-        save_csv(triangles_df, ticker, interval, "triangles")
+        df_triangles = pd.DataFrame(triangles, columns=["start", "end", "pattern", "confidence"])
+        save_csv(df_triangles, ticker, interval, "triangles")
         status["triangles"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Triangles error: {e}")
@@ -147,11 +137,8 @@ def aggregate_and_save(ticker, interval):
 
     try:
         wedges = find_wedges(ticker, interval)
-        if wedges:
-            wedges_df = pd.DataFrame(wedges, columns=["start", "end", "pattern", "confidence"])
-        else:
-            wedges_df = pd.DataFrame(columns=["start", "end", "pattern", "confidence"])
-        save_csv(wedges_df, ticker, interval, "wedges")
+        df_wedges = pd.DataFrame(wedges, columns=["start", "end", "pattern", "confidence"])
+        save_csv(df_wedges, ticker, interval, "wedges")
         status["wedges"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Wedges error: {e}")
@@ -159,11 +146,8 @@ def aggregate_and_save(ticker, interval):
 
     try:
         hs = find_head_shoulders(ticker, interval)
-        if hs:
-            hs_df = pd.DataFrame(hs, columns=["left", "head", "right", "pattern", "confidence"])
-        else:
-            hs_df = pd.DataFrame(columns=["left", "head", "right", "pattern", "confidence"])
-        save_csv(hs_df, ticker, interval, "head_shoulders")
+        df_hs = pd.DataFrame(hs, columns=["left", "head", "right", "pattern", "confidence"])
+        save_csv(df_hs, ticker, interval, "head_shoulders")
         status["head_shoulders"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Head-Shoulders error: {e}")
@@ -179,11 +163,13 @@ def main(intervals=["1m", "2m", "5m", "15m", "1h", "1d", "1wk"]):
         for interval in intervals:
             status = aggregate_and_save(ticker, interval)
             summary[ticker][interval] = status
-    # Print/Log a summary at the end
     for ticker in summary:
         for interval in summary[ticker]:
-            st = summary[ticker][interval]
-            logging.info(f"[{ticker} {interval}] Results: {st}")
+            logging.info(f"[{ticker} {interval}] Results: {summary[ticker][interval]}")
+
+def run_signals():
+    """Used by stonks analeyes CLI command"""
+    main()
 
 if __name__ == "__main__":
     main()

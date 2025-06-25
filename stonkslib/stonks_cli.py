@@ -10,6 +10,10 @@ from stonkslib.utils.clean_td import clean_td
 from stonkslib.utils.load_td import load_td
 from stonkslib.utils.wipe_raw_td import clear_raw_td
 from stonkslib.utils.wipe_clean_td import clear_clean_td
+from stonkslib.utils.wipe_signals import wipe_signals
+from stonkslib.analysis.signals import run_signals
+from stonkslib.merge.by_indicators import run_merge
+
 
 # Suppress specific pandas date warnings
 warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
@@ -45,18 +49,29 @@ def clean_cmd(force):
             try:
                 df = clean_td(ticker, interval, force=force)
                 if df is not None:
-                    print(f"[✓] Cleaned {ticker} ({interval}) — {len(df)} rows")
+                    print(f"[\u2713] Cleaned {ticker} ({interval}) — {len(df)} rows")
             except Exception as e:
                 print(f"[!] Failed to clean {ticker} ({interval}): {e}")
 
 @cli.command(name="wipe")
-@click.option("--target", type=click.Choice(["raw", "clean", "all"]), default="raw", help="Target directory to wipe")
+@click.option("--target", type=click.Choice(["raw", "clean", "signals", "merged", "all"]), default="raw", help="Target directory to wipe")
 def wipe_cmd(target):
-    """Wipe raw or clean ticker data folders"""
-    if target == "raw":
-        clear_raw_td()
-    elif target == "clean":
-        clear_clean_td()
-    elif target == "all":
-        clear_raw_td()
-        clear_clean_td()
+    """Wipe raw, clean, signals, merged, or all data folders"""
+    class DummyArgs:
+        def __init__(self, target):
+            self.target = target
+    wipe_signals(DummyArgs(target))
+
+@cli.command(name="analeyes")
+def analeyes_cmd():
+    """Run signal analysis for all tickers and intervals"""
+    run_signals()
+
+@cli.command(name="merge")
+def merge_cmd():
+    """Merge signal CSVs into combined files per ticker/interval"""
+    run_merge()
+
+
+if __name__ == "__main__":
+    cli()

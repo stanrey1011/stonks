@@ -12,26 +12,25 @@ warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
+CONFIDENCE_THRESHOLD = 0.2
+SHOULDER_TOLERANCE = 0.05  # 5%
+
 def find_head_shoulders(ticker, interval, window=5):
     """
-    Detect head and shoulders chart patterns from OHLC data.
-    Uses the entire cleaned dataset.
+    Detect Head and Shoulders patterns from OHLC data and return as a DataFrame.
     """
-    if not isinstance(interval, str):
-        interval = str(interval)
-
     try:
         df = load_td([ticker], interval)[ticker]
     except FileNotFoundError as e:
         log.warning(f"[!] {e}")
-        return []
+        return pd.DataFrame(columns=["left", "head", "right", "pattern", "confidence"])
 
     df = df.sort_index().copy()
     df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
     df = df.dropna(subset=["Close"])
 
     if df.empty or "Close" not in df.columns:
-        return []
+        return pd.DataFrame(columns=["left", "head", "right", "pattern", "confidence"])
 
     highs_idx = argrelextrema(df["Close"].values, np.greater_equal, order=window)[0]
     lows_idx = argrelextrema(df["Close"].values, np.less_equal, order=window)[0]
@@ -39,46 +38,42 @@ def find_head_shoulders(ticker, interval, window=5):
     patterns = []
 
     for i in range(1, len(highs_idx) - 1):
-        left_shoulder = highs_idx[i - 1]
+        left = highs_idx[i - 1]
         head = highs_idx[i]
-        right_shoulder = highs_idx[i + 1]
+        right = highs_idx[i + 1]
 
-        l_close = df.iloc[left_shoulder]["Close"]
+        l_close = df.iloc[left]["Close"]
         h_close = df.iloc[head]["Close"]
-        r_close = df.iloc[right_shoulder]["Close"]
+        r_close = df.iloc[right]["Close"]
 
-        # Head must be higher than both shoulders
         if h_close > l_close and h_close > r_close:
             shoulder_diff = abs(l_close - r_close)
-            if shoulder_diff < 0.05 * h_close:  # Shoulders within 5% of head
-                # Find neckline between the two shoulders
-                neck_range = lows_idx[(lows_idx > left_shoulder) & (lows_idx < right_shoulder)]
+            if shoulder_diff < SHOULDER_TOLERANCE * h_close:
+                neck_range = lows_idx[(lows_idx > left) & (lows_idx < right)]
                 if len(neck_range) == 0:
                     continue
-                neck_line_min_idx = neck_range.min()
-                neckline = df.iloc[neck_line_min_idx]["Close"]
 
                 confidence = round(1.0 - shoulder_diff * 50, 2)
-                if confidence >= 0.4:
+                if confidence >= CONFIDENCE_THRESHOLD:
                     patterns.append((
-                        df.iloc[left_shoulder].name,
-                        df.iloc[head].name,
-                        df.iloc[right_shoulder].name,
+                        df.index[left],
+                        df.index[head],
+                        df.index[right],
                         "Head and Shoulders",
                         confidence
                     ))
 
-    return patterns
+    return pd.DataFrame(patterns, columns=["left", "head", "right", "pattern", "confidence"])
 
 if __name__ == "__main__":
     ticker = "AAPL"
     intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
     for interval in intervals:
         print(f"🔍 Checking {ticker} ({interval})...")
-        patterns = find_head_shoulders(ticker, interval)
-        if patterns:
-            print(f"✔️ Found {len(patterns)} patterns for {ticker} ({interval})")
-            for (left, head, right, pattern, confidence) in patterns:
-                print(f"  🧑‍🎤 {pattern} from {left} to {right} with confidence {confidence}")
+        df = find_head_shoulders(ticker, interval)
+        if not df.empty:
+            print(f"✔️ Found {len(df)} patterns")
+            for _, row in df.iterrows():
+                print(f"  🧑‍🎤 {row['pattern']} from {row['left']} to {row['right']} with confidence {row['confidence']}")
         else:
-            print(f"❌ No patterns found for {ticker} ({interval})")
+            print("❌ No patterns found.")

@@ -82,11 +82,10 @@ def analyze_ticker(ticker, df, interval):
 def main():
     tickers = load_tickers()
     interval = "1d"
-    lookback = 60
 
     for ticker in tickers:
         logger.info(f"Analyzing {ticker}...")
-        df = load_td(ticker, interval, lookback)
+        df = load_td([ticker], interval)[ticker]
         if df is not None:
             analyze_ticker(ticker, df, interval)
         else:

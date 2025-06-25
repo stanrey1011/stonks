@@ -1,8 +1,7 @@
 from pathlib import Path
 import pandas as pd
 
-def load_td(tickers: list[str], interval: str, lookback: int = 120, base_dir: str = "data/ticker_data/clean"):
-#def load_td(category: str, interval: str, tickers: list, base_dir="data/ticker_data/clean"):
+def load_td(tickers: list[str], interval: str, base_dir: str = "data/ticker_data/clean"):
     """
     Load cleaned CSVs into memory for LLMs or analysis.
 
@@ -26,7 +25,7 @@ def load_td(tickers: list[str], interval: str, lookback: int = 120, base_dir: st
 
         df = pd.read_csv(file_path, index_col=0, parse_dates=True)
         df = df.sort_index()
-        data[ticker] = df.tail(lookback)
+        data[ticker] = df
 
     return data
 

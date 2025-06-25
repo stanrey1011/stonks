@@ -2,11 +2,13 @@ Stonks!
 
 tree -I "venv|__pycache__|*.egg-info" -L 2
 
-python cli.py fetch	stonks fetch
-python cli.py anal	stonks anal
-python cli.py check-span	stonks span
-python cli.py wipe-imports	stonks wipe-imports
-python cli.py wipe-anal		stonks wipe-anal
+1. update ticker.yaml
+2. stonks fetch - retrieves ticker data from yahoo finance (data/ticker_data/raw/{interval}/{ticker}.csv)
+3. stonks clean - clean and standardize raw ticker data (data/ticker_data/clean/{interval}/{ticker}.csv)
+4. stonks build - runs clean ticker through indicators and pattern detection (data/analysis/signals/{ticker}/{interval}/{source}.csv)
+5. stonks merge - combines all indicators and patterns into a single csv (data/analysis/signals/{ticker}/{interval}/{source}.csv)
+
+
 
 #updating directories
 find stonkslib -type f -name "*.py" -exec sed -i 's/from project\./from stonkslib./g' {} +
