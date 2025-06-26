@@ -12,7 +12,8 @@ from stonkslib.utils.wipe_raw_td import clear_raw_td
 from stonkslib.utils.wipe_clean_td import clear_clean_td
 from stonkslib.utils.wipe_signals import wipe_signals
 from stonkslib.analysis.signals import run_signals
-from stonkslib.merge.by_indicators import run_merge
+from stonkslib.merge.by_indicators import run_merge_indicators
+from stonkslib.merge.by_patterns import run_merge_patterns
 
 
 # Suppress specific pandas date warnings
@@ -62,16 +63,24 @@ def wipe_cmd(target):
             self.target = target
     wipe_signals(DummyArgs(target))
 
-@cli.command(name="analeyes")
-def analeyes_cmd():
+@cli.command(name="analyze")
+def analyze_cmd():
     """Run signal analysis for all tickers and intervals"""
     run_signals()
 
 @cli.command(name="merge")
-def merge_cmd():
-    """Merge signal CSVs into combined files per ticker/interval"""
-    run_merge()
-
+@click.option(
+    "--target",
+    type=click.Choice(["indicators", "patterns", "all"]),
+    default="all",
+    help="Which data to merge: indicators, patterns, or all",
+)
+def merge_cmd(target):
+    """Merge signals into combined time series format"""
+    if target in ("indicators", "all"):
+        run_merge_indicators()
+    if target in ("patterns", "all"):
+        run_merge_patterns()
 
 if __name__ == "__main__":
     cli()

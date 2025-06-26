@@ -155,7 +155,7 @@ def aggregate_and_save(ticker, interval):
 
     return status
 
-def main(intervals=["1m", "2m", "5m", "15m", "1h", "1d", "1wk"]):
+def main(intervals=["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]):
     tickers = load_ticker_list()
     summary = {}
     for ticker in tickers:

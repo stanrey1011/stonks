@@ -1,9 +1,11 @@
-# stonkslib/merge/by_ticker.py
+# stonkslib/merge/by_indicators.py
 
 import os
 import pandas as pd
 from pathlib import Path
 import logging
+
+from stonkslib.utils.load_td import load_td
 
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -23,7 +25,7 @@ def merge_signals_for_ticker_interval(ticker: str, interval: str):
 
     for csv_path in sorted(input_dir.glob("*.csv")):
         try:
-            # Pattern files start with non-timeseries structure, skip them
+            # Skip pattern files
             if csv_path.stem in {"doubles", "triangles", "wedges", "head_shoulders"}:
                 continue
 
@@ -32,12 +34,11 @@ def merge_signals_for_ticker_interval(ticker: str, interval: str):
             if df.empty or df.shape[0] < 2:
                 raise ValueError("File is empty or too short")
 
-            # Handle files with a "Date" column
+            # Parse time column
             if "Date" in df.columns:
                 df["Date"] = pd.to_datetime(df["Date"], errors="coerce", utc=True)
                 df.set_index("Date", inplace=True)
             else:
-                # Fallback to assuming first column is datetime
                 df.index = pd.to_datetime(df.iloc[:, 0], errors="coerce", utc=True)
                 df.drop(columns=df.columns[0], inplace=True)
 
@@ -54,6 +55,15 @@ def merge_signals_for_ticker_interval(ticker: str, interval: str):
         except Exception as e:
             logging.error(f"[!] Failed to read {csv_path}: {e}")
 
+    # --- Add price columns from cleaned data ---
+    try:
+        # This will grab the correct clean data for ticker/interval
+        price_df = load_td([ticker], interval)[ticker]
+        price_df = price_df[["Open", "High", "Low", "Close", "Volume"]]
+        merged_df = price_df.join(merged_df, how="outer")
+        # This will always put price columns at the start
+    except Exception as e:
+        logging.warning(f"[!] Could not join price data for {ticker} {interval}: {e}")
 
     if merged_df is not None and not merged_df.empty:
         merged_df.sort_index(inplace=True)
@@ -65,17 +75,15 @@ def merge_signals_for_ticker_interval(ticker: str, interval: str):
     else:
         logging.warning(f"[!] No valid files to merge for {ticker} ({interval})")
 
-def run_merge():
+def run_merge_indicators():
     tickers = [d.name for d in INPUT_BASE.iterdir() if d.is_dir()]
     for ticker in tickers:
-        for interval in (INPUT_BASE / ticker).iterdir():
-            if interval.is_dir():
-                merge_signals_for_ticker_interval(ticker, interval.name)
+        for interval in os.listdir(INPUT_BASE / ticker):
+            merge_signals_for_ticker_interval(ticker, interval)
 
 def main(intervals=None):
-    intervals = intervals or ["1m", "2m", "5m", "15m", "1h", "1d", "1wk"]
+    intervals = intervals or ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
     tickers = [d.name for d in INPUT_BASE.iterdir() if d.is_dir()]
-
     for ticker in tickers:
         for interval in intervals:
             merge_signals_for_ticker_interval(ticker, interval)
