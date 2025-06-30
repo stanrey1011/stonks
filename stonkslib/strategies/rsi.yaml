@@ -1,0 +1,25 @@
+name: "RSI Only"
+description: "Trade only on RSI overbought/oversold"
+indicators:
+  rsi:
+    enabled: true
+    params:
+      period: 14
+      overbought: 70
+      oversold: 30
+  macd:
+    enabled: false
+  ma_double:
+    enabled: false
+  bollinger:
+    enabled: false
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2

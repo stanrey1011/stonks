@@ -1,0 +1,27 @@
+name: "RSI + MACD Classic"
+description: "Trade when RSI<30 and MACD>0, sell when RSI>70 or stop loss."
+indicators:
+  rsi:
+    enabled: true
+    params:
+      period: 7
+      overbought: 70
+      oversold: 30
+  macd:
+    enabled: true
+    params:
+      short: 12
+      long: 26
+      signal: 9
+  ma_double:
+    enabled: false
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2

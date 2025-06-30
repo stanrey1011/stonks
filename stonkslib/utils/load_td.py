@@ -2,6 +2,8 @@ from pathlib import Path
 import pandas as pd
 
 def load_td(tickers: list[str], interval: str, base_dir: str = "data/ticker_data/clean"):
+#def load_td(tickers: list[str], interval: str, base_dir: str = "ticker_data/clean"):
+
     """
     Load cleaned CSVs into memory for LLMs or analysis.
 

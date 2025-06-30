@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PATTERN_DIR = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-patterns"
 PRICE_DIR = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-indicators"
-OUTPUT_BASE = PROJECT_ROOT / "data" / "analysis" / "backtests" / "patterns" / "doubles"
+OUTPUT_BASE = PROJECT_ROOT / "data" / "analysis" / "backtests" / "doubles"   # <--- FIXED path
 
 START_CASH = 10_000
 RISK_PER_TRADE = 0.2
@@ -89,7 +89,7 @@ def backtest_file(pattern_path, price_path, out_dir, interval):
     total_pnl = results_df.get("pnl", pd.Series([0])).sum()
     logging.info(f"    Final cash: {cash:.2f}, Net P&L: {total_pnl:.2f}, Trades: {len(results_df)//2}")
 
-def run_all_backtests():
+def run_all_backtests(strategy=None):
     intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
     for ticker_dir in PATTERN_DIR.iterdir():
         if not ticker_dir.is_dir():

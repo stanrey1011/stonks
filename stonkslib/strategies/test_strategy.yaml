@@ -1,0 +1,28 @@
+name: Trend Follower
+description: Buy when RSI is oversold and MACD is positive, sell when RSI is overbought or stop loss hit
+indicators:
+  rsi:
+    enabled: true
+    params:
+      period: 14
+      overbought: 70
+      oversold: 30
+  macd:
+    enabled: true
+    params:
+      short: 9
+      long: 26
+      signal: 9
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+  wedges:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2
+  stop_loss_pct: 0

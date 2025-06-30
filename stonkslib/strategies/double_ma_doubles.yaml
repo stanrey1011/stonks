@@ -1,0 +1,24 @@
+name: "MA Crossover + Double Bottom"
+description: "Buy on double MA crossover or double bottom; sell on reverse"
+indicators:
+  ma_double:
+    enabled: true
+    params:
+      swing: 20
+      long: 50
+  rsi:
+    enabled: false
+  macd:
+    enabled: false
+  bollinger:
+    enabled: false
+patterns:
+  doubles:
+    enabled: true
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2

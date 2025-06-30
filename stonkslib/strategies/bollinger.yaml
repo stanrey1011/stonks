@@ -1,0 +1,24 @@
+name: "Bollinger Band Breakout"
+description: "Buy on lower band breakout, sell on upper"
+indicators:
+  bollinger:
+    enabled: true
+    params:
+      window: 20
+      num_std_dev: 2
+  rsi:
+    enabled: false
+  macd:
+    enabled: false
+  ma_double:
+    enabled: false
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2

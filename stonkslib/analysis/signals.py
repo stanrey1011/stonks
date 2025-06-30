@@ -1,5 +1,3 @@
-# stonkslib/analysis/signals.py
-
 import logging
 import warnings
 import yaml
@@ -10,6 +8,8 @@ from stonkslib.indicators.bollinger import bollinger_bands
 from stonkslib.indicators.macd import macd
 from stonkslib.indicators.obv import obv
 from stonkslib.indicators.rsi import rsi
+from stonkslib.indicators.moving_avg_double import moving_averages, generate_ma_signals
+from stonkslib.indicators.moving_avg_triple import moving_averages_triple, generate_triple_ma_signals
 
 from stonkslib.patterns.doubles import find_doubles
 from stonkslib.patterns.triangles import find_triangles
@@ -67,7 +67,7 @@ def aggregate_and_save(ticker, interval):
         df = load_td([ticker], interval)[ticker]
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Data load error: {e}")
-        for key in ["rsi", "macd", "bollinger", "obv"]:
+        for key in ["rsi", "macd", "bollinger", "obv", "ma_double", "ma_triple"]:
             status[key] = f"error: {e}"
         return status
 
@@ -116,6 +116,28 @@ def aggregate_and_save(ticker, interval):
         logging.error(f"[{ticker} {interval}] OBV error: {e}")
         status["obv"] = f"error: {e}"
 
+    # --- Double MA ---
+    try:
+        ma_df = moving_averages(df.copy(), swing_window=20, long_window=50, ma_type="EMA")
+        ma_signals_df = generate_ma_signals(ma_df, ticker=ticker, interval=interval)
+        save_csv(ma_df, ticker, interval, "ma_double")
+        save_csv(ma_signals_df, ticker, interval, "ma_double_signals")
+        status["ma_double"] = "ok"
+    except Exception as e:
+        logging.error(f"[{ticker} {interval}] Double MA error: {e}")
+        status["ma_double"] = f"error: {e}"
+
+    # --- Triple MA ---
+    try:
+        triple_ma_df = moving_averages_triple(df.copy(), short_window=9, medium_window=21, long_window=50, ma_type="EMA")
+        triple_ma_signals_df = generate_triple_ma_signals(triple_ma_df, ticker=ticker, interval=interval)
+        save_csv(triple_ma_df, ticker, interval, "ma_triple")
+        save_csv(triple_ma_signals_df, ticker, interval, "ma_triple_signals")
+        status["ma_triple"] = "ok"
+    except Exception as e:
+        logging.error(f"[{ticker} {interval}] Triple MA error: {e}")
+        status["ma_triple"] = f"error: {e}"
+
     # --- Patterns ---
     try:
         doubles = find_doubles(ticker, interval)
@@ -161,8 +183,10 @@ def main(intervals=["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]):
     for ticker in tickers:
         summary[ticker] = {}
         for interval in intervals:
+            print(f"\n=== {ticker} — {interval} ===")
             status = aggregate_and_save(ticker, interval)
             summary[ticker][interval] = status
+            print(f"Results: {status}")
     for ticker in summary:
         for interval in summary[ticker]:
             logging.info(f"[{ticker} {interval}] Results: {summary[ticker][interval]}")
