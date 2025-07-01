@@ -655,3 +655,69 @@ Corrupt JPEG data: premature end of data segment
 ** (CrealityPrint:120997): CRITICAL **: 17:10:06.320: Cannot register URI scheme memory more than once
 on leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaverequest for resource: /resources/profiles/Creality/Creality%20K1C_cover.png
 Request received: GET /resources/profiles/Creality/Creality%20K1C_cover.pngdone
+
+** (CrealityPrint:120997): CRITICAL **: 21:21:16.470: Cannot register URI scheme wxfs more than once
+
+** (CrealityPrint:120997): CRITICAL **: 21:21:16.470: Cannot register URI scheme memory more than once
+request for resource: /resources/profiles/Creality/Creality%20K1C_cover.png
+Request received: GET /resources/profiles/Creality/Creality%20K1C_cover.pngdone
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.634: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.636: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.636: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.638: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.638: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.638: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:32:55.638: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.010: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.011: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.011: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.012: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.012: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.013: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.013: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.013: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.013: gtk_widget_set_size_request: assertion 'width >= -1' failed
