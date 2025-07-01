@@ -4,11 +4,17 @@ __pycache__/
 *.egg-info/
 *.log
 
-# Virtual env
+# Virtual envs
 venv/
+env/
+ENV/
+.venv/
 
 # Data
 data/
+log/
+charts/
+*.db
 
 # OS-specific
 .DS_Store
@@ -17,12 +23,14 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 
-# VSCode
+# Editors/IDEs
 .vscode/
-
-# PyCharm
 .idea/
 
-# Others
+# Build/Dist
 build/
 dist/
+*.tar.gz
+*.zip
+*.bak
+*.tmp
