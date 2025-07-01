@@ -66,7 +66,7 @@ Supports overlays for Bollinger Bands, moving averages, and more, with a simple 
 
 6. **Run the dashboard**
     ```sh
-    streamlit run stonkslib/plots/dashboard.py
+    streamlit run stonkslib/dash/dashboard.py
     ```
     Then open the provided URL (usually [http://localhost:8501](http://localhost:8501)) in your browser.
 
