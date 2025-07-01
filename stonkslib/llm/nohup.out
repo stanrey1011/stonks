@@ -648,3 +648,10 @@ best:-0.000000  1.000000 -0.000000, costs:65.3,	13508.0,	9048.8,	464.9,	65.3,	0.
 ** (CrealityPrint:120997): CRITICAL **: 21:27:55.495: Cannot register URI scheme memory more than once
 on leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaverequest for resource: /resources/profiles/Creality/Creality%20K1C_cover.png
 Request received: GET /resources/profiles/Creality/Creality%20K1C_cover.pngdone
+Corrupt JPEG data: premature end of data segment
+
+** (CrealityPrint:120997): CRITICAL **: 17:10:06.320: Cannot register URI scheme wxfs more than once
+
+** (CrealityPrint:120997): CRITICAL **: 17:10:06.320: Cannot register URI scheme memory more than once
+on leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaverequest for resource: /resources/profiles/Creality/Creality%20K1C_cover.png
+Request received: GET /resources/profiles/Creality/Creality%20K1C_cover.pngdone
