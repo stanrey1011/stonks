@@ -114,7 +114,7 @@ Open an issue or submit a pull request!
 
 ## Folder Structure
 
----
+```
 
 stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 │
@@ -160,11 +160,11 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 ├── setup.py # 🛠️ Legacy Python setup for pip install (if needed)
 └── venv/ # 🐍 Local Python virtualenv (never committed to Git)
 
----
+```
 
 ### yfinance Intervals & Lookback Limits
 
----
+```
 
 | Interval | Description     | Stocks/ETFs         | Crypto (BTC/ETH-USD) |
 |----------|-----------------|---------------------|----------------------|
@@ -177,7 +177,7 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 | `1wk`    | Weekly OHLC     | Full history        | Full history         |
 | `1mo`    | Monthly OHLC    | Full history        | Full history         |
 
----
+```
 
 ## Ziping the project
 zip -r stonks_clean.zip stonks \
