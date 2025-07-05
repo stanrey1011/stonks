@@ -721,3 +721,85 @@ Request received: GET /resources/profiles/Creality/Creality%20K1C_cover.pngdone
 (CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.013: gtk_widget_set_size_request: assertion 'width >= -1' failed
 
 (CrealityPrint:120997): Gtk-CRITICAL **: 21:33:16.013: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+** (CrealityPrint:120997): CRITICAL **: 18:00:39.475: Cannot register URI scheme wxfs more than once
+
+** (CrealityPrint:120997): CRITICAL **: 18:00:39.475: Cannot register URI scheme memory more than once
+on leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaverequest for resource: /resources/profiles/Creality/Creality%20K1C_cover.png
+Request received: GET /resources/profiles/Creality/Creality%20K1C_cover.pngdone
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:05.345: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:05.345: gtk_widget_set_size_request: assertion 'width >= -1' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:05:15.057: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.057: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:05:15.057: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.057: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.058: gtk_window_resize: assertion 'width > 0' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:05:15.059: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.059: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:05:15.128: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.128: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:05:15.129: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.129: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:05:15.129: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.129: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:05:15.129: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:05:15.129: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+** (CrealityPrint:120997): CRITICAL **: 18:05:30.980: Cannot register URI scheme wxfs more than once
+
+** (CrealityPrint:120997): CRITICAL **: 18:05:30.980: Cannot register URI scheme memory more than once
+on leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaveon leaverequest for resource: /resources/profiles/Creality/Creality%20K1C_cover.png
+Request received: GET /resources/profiles/Creality/Creality%20K1C_cover.pngdone
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.419: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.419: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.419: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.419: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.447: gtk_window_resize: assertion 'width > 0' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.447: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.447: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.448: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.448: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.450: gtk_window_resize: assertion 'width > 0' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.450: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.450: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.450: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.450: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.451: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.451: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed
+
+(CrealityPrint:120997): GLib-GObject-CRITICAL **: 18:06:29.451: invalid cast from 'wxPizza' to 'GtkCellLayout'
+
+(CrealityPrint:120997): Gtk-CRITICAL **: 18:06:29.451: gtk_cell_layout_get_cells: assertion 'GTK_IS_CELL_LAYOUT (cell_layout)' failed

@@ -47,21 +47,37 @@ def merge_signals_for_ticker_interval(ticker: str, interval: str):
                 logging.warning(f"[!] {csv_path.name} has no valid timestamps, skipping")
                 continue
 
-            df.columns = [f"{csv_path.stem}_{col}" for col in df.columns]
+            # Smarter prefixing logic to avoid redundancy
+            def needs_prefix(stem, col):
+                return not col.lower().startswith(stem.lower()) \
+                    and not col.lower().startswith(("bb_", "macd", "rsi", "ma_", "obv", "fibonacci"))
+
+            df.columns = [
+                col if not needs_prefix(csv_path.stem, col) else f"{csv_path.stem}_{col}"
+                for col in df.columns
+            ]
             df.index.name = "Date"
 
-            merged_df = df if merged_df is None else merged_df.join(df, how="outer")
+            if merged_df is None:
+                merged_df = df
+            else:
+                overlapping = set(df.columns) & set(merged_df.columns)
+                if overlapping:
+                    df = df.rename(columns={col: f"{col}_{csv_path.stem}" for col in overlapping})
+                merged_df = merged_df.join(df, how="outer")
 
         except Exception as e:
             logging.error(f"[!] Failed to read {csv_path}: {e}")
 
     # --- Add price columns from cleaned data ---
     try:
-        # This will grab the correct clean data for ticker/interval
-        price_df = load_td([ticker], interval)[ticker]
-        price_df = price_df[["Open", "High", "Low", "Close", "Volume"]]
-        merged_df = price_df.join(merged_df, how="outer")
-        # This will always put price columns at the start
+        cleaned = load_td([ticker], interval)
+        if ticker not in cleaned:
+            logging.warning(f"[!] Missing cleaned file: {ticker} ({interval})")
+        else:
+            price_df = cleaned[ticker]
+            price_df = price_df[["Open", "High", "Low", "Close", "Volume"]]
+            merged_df = price_df.join(merged_df, how="outer")
     except Exception as e:
         logging.warning(f"[!] Could not join price data for {ticker} {interval}: {e}")
 

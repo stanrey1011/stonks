@@ -1,23 +1,25 @@
 # stonkslib/utils/clean_td.py
 
-import os
+from pathlib import Path
 import pandas as pd
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
 
-def clean_td(ticker, interval, base_dir=BASE_DIR, force=False, verbose=True):
-    raw_path = os.path.join(base_dir, "data", "ticker_data", "raw", interval, f"{ticker}.csv")
-    clean_path = os.path.join(base_dir, "data", "ticker_data", "clean", interval, f"{ticker}.csv")
+# Resolve root directory automatically
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_BASE = PROJECT_ROOT / "data" / "ticker_data" / "raw"
+CLEAN_BASE = PROJECT_ROOT / "data" / "ticker_data" / "clean"
 
-    if not os.path.exists(raw_path):
+def clean_td(ticker, interval, force=False, verbose=True):
+    raw_path = RAW_BASE / interval / f"{ticker}.csv"
+    clean_path = CLEAN_BASE / interval / f"{ticker}.csv"
+
+    if not raw_path.exists():
         if verbose:
             print(f"[!] No raw data for {ticker} ({interval})")
         return None
 
     try:
-        # Load, only keep rows that start with a date (YYYY-MM-DD)
         df = pd.read_csv(raw_path, dtype=str)
         df = df[df[df.columns[0]].str.match(r"\d{4}-\d{2}-\d{2}")]
 
@@ -32,23 +34,18 @@ def clean_td(ticker, interval, base_dir=BASE_DIR, force=False, verbose=True):
         df.dropna(subset=COLUMNS, inplace=True)
 
         # Robust timezone handling
-        # --- For daily and weekly: force to midnight UTC (no time drift)
         if interval in ["1d", "1wk"]:
-            # Make sure index is normalized to midnight UTC, and tz-aware
             df.index = df.index.tz_convert('UTC') if df.index.tz is not None else df.index.tz_localize('UTC')
-            df.index = df.index.normalize()  # sets time to 00:00:00
+            df.index = df.index.normalize()
         else:
-            # For intraday: just make sure tz-aware UTC
             df.index = df.index.tz_convert('UTC') if df.index.tz is not None else df.index.tz_localize('UTC')
 
-        # Final sanity check
         if df.empty or df.index[0].year < 1980:
             print(f"[!] Data looks wrong after cleaning {ticker} ({interval})—please check your raw file!")
             return None
 
-        os.makedirs(os.path.dirname(clean_path), exist_ok=True)
-        if force or not os.path.exists(clean_path):
-            # Save with timestamp as string (always ISO8601 with UTC)
+        clean_path.parent.mkdir(parents=True, exist_ok=True)
+        if force or not clean_path.exists():
             df.to_csv(clean_path)
             if verbose:
                 print(f"[✔] Cleaned data written: {clean_path}")

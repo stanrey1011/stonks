@@ -93,12 +93,36 @@ def analyze_cmd():
     default="all",
     help="Which data to merge: indicators, patterns, or all",
 )
-def merge_cmd(target):
+@click.option(
+    "--ticker",
+    type=str,
+    default=None,
+    help="Limit merging to a specific ticker",
+)
+@click.option(
+    "--interval",
+    type=str,
+    default=None,
+    help="Limit merging to a specific interval",
+)
+def merge_cmd(target, ticker, interval):
     """Merge signals into combined time series format"""
     if target in ("indicators", "all"):
-        run_merge_indicators()
+        if ticker and interval:
+            from stonkslib.merge.by_indicators import merge_signals_for_ticker_interval
+            merge_signals_for_ticker_interval(ticker, interval)
+        else:
+            from stonkslib.merge.by_indicators import run_merge_indicators
+            run_merge_indicators()
+
     if target in ("patterns", "all"):
-        run_merge_patterns()
+        if ticker and interval:
+            from stonkslib.merge.by_patterns import merge_patterns_for_ticker_interval
+            merge_patterns_for_ticker_interval(ticker, interval)
+        else:
+            from stonkslib.merge.by_patterns import run_merge_patterns
+            run_merge_patterns()
+
 
 @cli.command(name="backtest")
 @click.option(

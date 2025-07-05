@@ -10,6 +10,7 @@ from stonkslib.indicators.obv import obv
 from stonkslib.indicators.rsi import rsi
 from stonkslib.indicators.moving_avg_double import moving_averages, generate_ma_signals
 from stonkslib.indicators.moving_avg_triple import moving_averages_triple, generate_triple_ma_signals
+from stonkslib.indicators.fibonacci import calculate_fibonacci_levels, generate_fibonacci_signals
 
 from stonkslib.patterns.doubles import find_doubles
 from stonkslib.patterns.triangles import find_triangles
@@ -67,7 +68,7 @@ def aggregate_and_save(ticker, interval):
         df = load_td([ticker], interval)[ticker]
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Data load error: {e}")
-        for key in ["rsi", "macd", "bollinger", "obv", "ma_double", "ma_triple"]:
+        for key in ["rsi", "macd", "bollinger", "obv", "ma_double", "ma_triple", "fibonacci"]:
             status[key] = f"error: {e}"
         return status
 
@@ -137,6 +138,24 @@ def aggregate_and_save(ticker, interval):
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Triple MA error: {e}")
         status["ma_triple"] = f"error: {e}"
+
+    # --- Fibonacci ---
+    try:
+        fib_data = calculate_fibonacci_levels(df, lookback=100)
+        if fib_data:
+            raw_signals = generate_fibonacci_signals(df, fib_data, ticker=ticker, interval=interval)
+
+            if not raw_signals.empty:
+                fib_signals = raw_signals[["Close", "Signal"]].rename(
+                    columns={"Close": "fibonacci_Close", "Signal": "fibonacci_Signal"}
+                )
+                fib_signals = fib_signals.tail(5)
+                save_csv(fib_signals, ticker, interval, "fibonacci")
+
+        status["fibonacci"] = "ok"
+    except Exception as e:
+        logging.error(f"[{ticker} {interval}] Fibonacci error: {e}")
+        status["fibonacci"] = f"error: {e}"
 
     # --- Patterns ---
     try:
