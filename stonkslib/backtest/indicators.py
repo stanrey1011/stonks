@@ -175,18 +175,17 @@ def backtest_file(filepath, outpath, strat_config, ticker):
 
 def run_all_backtests(df=None, strat_config=None, ticker=None, output_dir=OUTPUT_BASE):
     if df is not None and ticker is not None and strat_config is not None:
-        outdir = Path(output_dir) / ticker
+        outdir = output_dir / "indicators" / ticker
         outdir.mkdir(parents=True, exist_ok=True)
         outpath = outdir / f"{strat_config.get('name', 'indicators')}.csv"
         backtest_file(df, outpath, strat_config, ticker)
     else:
-        for ticker_dir in INPUT_BASE.iterdir():
-            if not ticker_dir.is_dir():
-                continue
-            ticker = ticker_dir.name
-            for interval_file in ticker_dir.iterdir():
-                if interval_file.suffix == ".csv":
-                    outdir = Path(output_dir) / ticker
-                    outdir.mkdir(parents=True, exist_ok=True)
-                    outpath = outdir / f"{interval_file.stem}.csv"
-                    backtest_file(interval_file, outpath, strat_config or {}, ticker)
+        intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
+        tickers = [d.name for d in (TICKER_DATA_DIR / "analysis" / "merged" / "by-indicators").iterdir() if d.is_dir()]
+        for ticker in tickers:
+            for interval in intervals:
+                input_file = TICKER_DATA_DIR / "analysis" / "merged" / "by-indicators" / ticker / f"{interval}.csv"
+                outdir = output_dir / "indicators" / ticker
+                outpath = outdir / f"{interval}.csv"
+                if input_file.exists():
+                    backtest_file(input_file, outpath, strat_config or {}, ticker)

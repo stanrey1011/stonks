@@ -1,16 +1,9 @@
-import os
 import click
 import yaml
-import pandas as pd
-import json
 from pathlib import Path
 from stonkslib.utils.load_strategy import load_strategy_config
 from stonkslib.utils.logging import setup_logging
 from stonkslib.backtest.indicators import run_all_backtests as backtest_indicators
-try:
-    from stonkslib.backtest.doubles import run_all_backtests as backtest_doubles
-except ImportError:
-    backtest_doubles = None
 try:
     from stonkslib.backtest.triangles import run_all_backtests as backtest_triangles
 except ImportError:
@@ -25,7 +18,7 @@ except ImportError:
     backtest_wedges = None
 
 # Load configuration
-PROJECT_ROOT = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 
 # Setup logging (fallback)
@@ -39,24 +32,31 @@ try:
         raise ValueError("config.yaml is empty or invalid")
 except FileNotFoundError:
     logger.error(f"[!] Config file not found at {CONFIG_PATH}")
-    config = {"project": {"options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
+    config = {"project": {"ticker_data_dir": "data/ticker_data/raw", "options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
 except Exception as e:
     logger.error(f"[!] Error loading config.yaml: {e}")
-    config = {"project": {"options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
+    config = {"project": {"ticker_data_dir": "data/ticker_data/raw", "options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
 
+TICKER_DATA_DIR = PROJECT_ROOT / config["project"]["ticker_data_dir"]
 OPTIONS_DATA_DIR = PROJECT_ROOT / config["project"]["options_data_dir"]
 BACKTEST_DIR = PROJECT_ROOT / config["project"]["backtest_dir"]
 LOG_DIR = PROJECT_ROOT / config["project"]["log_dir"]
 
-# Re-setup logging with correct log_dir
+# Re-setup logging
 logger = setup_logging(LOG_DIR, "backtest.log")
 
 @click.command()
 @click.option(
+    "--type",
+    type=click.Choice(["stocks", "options"]),
+    default="stocks",
+    help="Backtest type: stocks or options",
+)
+@click.option(
     "--target",
-    type=click.Choice(["all", "indicators", "doubles", "triangles", "head_shoulders", "wedges"]),
+    type=click.Choice(["all", "indicators", "triangles", "head_shoulders", "wedges"]),
     default="all",
-    help="Which backtests to run: indicators, doubles, triangles, head_shoulders, wedges, or all",
+    help="Which backtests to run: indicators, triangles, head_shoulders, wedges, or all",
 )
 @click.option(
     "--config",
@@ -68,13 +68,18 @@ logger = setup_logging(LOG_DIR, "backtest.log")
     "--strategy",
     type=click.Choice(["leaps", "covered_calls", "secured_puts"]),
     default=None,
-    help="Strategy to backtest (default: all from config.yaml)",
+    help="Strategy to backtest (required for options, default: all from config.yaml for stocks)",
 )
 @click.option("--ticker", type=str, default="AAPL", help="Ticker to backtest (default: AAPL)")
-def backtest(target, config, strategy, ticker):
-    """Run backtests on merged data, using a strategy config if provided."""
+def backtest(type, target, config, strategy, ticker):
+    """Run backtests on stock or options data."""
     strategy_config = load_strategy_config(config) if config else None
+    if type == "options" and not strategy:
+        logger.error("[!] --strategy must be specified for options backtests")
+        return
+
     strategies_to_run = [strategy] if strategy else config.get("strategies", {}).keys()
+    output_base = BACKTEST_DIR / type
 
     ran = False
     for strat in strategies_to_run:
@@ -83,43 +88,24 @@ def backtest(target, config, strategy, ticker):
             logger.error(f"[!] No config for strategy {strat}, skipping...")
             continue
 
-        data_path = OPTIONS_DATA_DIR / strat_config["output_dir"] / f"{ticker}.csv"
-        try:
-            df = pd.read_csv(data_path)
-        except FileNotFoundError:
-            logger.error(f"[!] No data found for {ticker} in {data_path}")
-            continue
+        output_dir = output_base / strat if type == "options" else output_base
 
         if target in ("all", "indicators"):
-            logger.info(f"[*] Running indicator backtest for {strat} on {ticker}...")
-            backtest_indicators(df, strat_config, ticker, BACKTEST_DIR)
-            ran = True
-        if target in ("all", "doubles") and backtest_doubles:
-            logger.info(f"[*] Running doubles pattern backtest for {strat} on {ticker}...")
-            backtest_doubles(df, strat_config, ticker, BACKTEST_DIR)
+            logger.info(f"[*] Running indicator backtest for {strat} on {ticker} ({type})...")
+            backtest_indicators(None, strat_config, ticker, output_dir)
             ran = True
         if target in ("all", "triangles") and backtest_triangles:
-            logger.info(f"[*] Running triangles pattern backtest for {strat} on {ticker}...")
-            backtest_triangles(df, strat_config, ticker, BACKTEST_DIR)
+            logger.info(f"[*] Running triangles pattern backtest for {strat} on {ticker} ({type})...")
+            backtest_triangles(None, strat_config, ticker, output_dir)
             ran = True
         if target in ("all", "head_shoulders") and backtest_head_shoulders:
-            logger.info(f"[*] Running head-shoulders pattern backtest for {strat} on {ticker}...")
-            backtest_head_shoulders(df, strat_config, ticker, BACKTEST_DIR)
+            logger.info(f"[*] Running head-shoulders pattern backtest for {strat} on {ticker} ({type})...")
+            backtest_head_shoulders(None, strat_config, ticker, output_dir)
             ran = True
         if target in ("all", "wedges") and backtest_wedges:
-            logger.info(f"[*] Running wedges pattern backtest for {strat} on {ticker}...")
-            backtest_wedges(df, strat_config, ticker, BACKTEST_DIR)
+            logger.info(f"[*] Running wedges pattern backtest for {strat} on {ticker} ({type})...")
+            backtest_wedges(None, strat_config, ticker, output_dir)
             ran = True
-
-        if ran:
-            filtered = df[df["strike"] > 0]
-            returns = filtered["lastPrice"].sum() if not filtered.empty else 0
-            result = {"symbol": ticker, "strategy": strat, "metrics": {"returns": returns}}
-            output_file = BACKTEST_DIR / f"{strat}_{ticker}.json"
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_file, "w") as f:
-                json.dump(result, f)
-            logger.info(f"[✓] Backtest saved to {output_file}")
 
     if not ran:
         logger.error("[!] No backtest ran (perhaps module missing or typo in --target)")
