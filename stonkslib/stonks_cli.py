@@ -12,6 +12,8 @@ from stonkslib.utils.wipe_signals import wipe_signals
 from stonkslib.analysis.signals import run_signals
 from stonkslib.merge.by_indicators import run_merge_indicators
 from stonkslib.merge.by_patterns import run_merge_patterns
+from stonkslib.fetch.options.generic import fetch_all_options
+
 
 # === New: strategy config loader ===
 from stonkslib.utils.load_strategy import load_strategy_config
@@ -41,22 +43,119 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TICKER_YAML = os.path.join(BASE_DIR, "tickers.yaml")
 STRATEGY_DIR = os.path.join(os.path.dirname(__file__), "strategies")
 
-def load_tickers(yaml_file=TICKER_YAML):
+def load_tickers(category=None, yaml_file=TICKER_YAML):
     with open(yaml_file, "r") as f:
         data = yaml.safe_load(f)
+    if category:
+        return data.get(category, [])
+    # All by default:
     return data.get("stocks", []) + data.get("crypto", []) + data.get("etfs", [])
 
 @click.group()
 def cli():
     """Stonks CLI"""
-    pass
 
-@cli.command(name="fetch")
+# ========================== FETCH GROUP ==========================
+@cli.group()
+def fetch():
+    """Fetch raw data (OHLCV, options, etc)."""
+
+# --- Fetch OHLC/price data: stocks, etf, crypto ---
+@fetch.command("stocks")
 @click.option("--force", is_flag=True, help="Force re-download and overwrite existing CSVs")
-def fetch_cmd(force):
-    """Fetch all data for all tickers with predefined intervals"""
-    fetch_all(force=force)
+def fetch_stocks(force):
+    """Fetch all stock OHLCV data."""
+    fetch_all(force=force, category="stocks")
 
+@fetch.command("etfs")
+@click.option("--force", is_flag=True, help="Force re-download and overwrite existing CSVs")
+def fetch_etf(force):
+    """Fetch all ETF OHLCV data."""
+    fetch_all(force=force, category="etfs")
+
+@fetch.command("crypto")
+@click.option("--force", is_flag=True, help="Force re-download and overwrite existing CSVs")
+def fetch_crypto(force):
+    """Fetch all crypto OHLCV data."""
+    fetch_all(force=force, category="crypto")
+
+# ================== FETCH OPTIONS NESTED GROUPS ==================
+@fetch.group()
+def options():
+    """Fetch option chains."""
+
+@options.group()
+def buy():
+    """Buy side options."""
+
+@options.group()
+def sell():
+    """Sell side options."""
+
+# Buy side: calls & puts
+@buy.command("calls")
+@click.argument("term", type=click.Choice(["leaps", "weekly", "monthly", "custom"]))
+@click.option("--ticker", type=str, default=None)
+def buy_calls(term, ticker):
+    run_options_fetch("buy", "calls", term, ticker)
+
+@buy.command("puts")
+@click.argument("term", type=click.Choice(["leaps", "weekly", "monthly", "custom"]))
+@click.option("--ticker", type=str, default=None)
+def buy_puts(term, ticker):
+    run_options_fetch("buy", "puts", term, ticker)
+
+# Sell side: calls & puts
+@sell.command("calls")
+@click.argument("term", type=click.Choice(["leaps", "weekly", "monthly", "custom"]))
+@click.option("--ticker", type=str, default=None)
+def sell_calls(term, ticker):
+    run_options_fetch("sell", "calls", term, ticker)
+
+@sell.command("puts")
+@click.argument("term", type=click.Choice(["leaps", "weekly", "monthly", "custom"]))
+@click.option("--ticker", type=str, default=None)
+def sell_puts(term, ticker):
+    run_options_fetch("sell", "puts", term, ticker)
+
+def run_options_fetch(side, option_type, term, ticker):
+    # DTE logic
+    if term == "leaps":
+        min_dte, max_dte = 270, 9999
+    elif term == "weekly":
+        min_dte, max_dte = 7, 13
+    elif term == "monthly":
+        min_dte, max_dte = 30, 45
+    else:
+        min_dte, max_dte = 0, 9999
+
+    output_dir = os.path.join(
+        "data", "options_data", "raw",
+        option_type, side, term
+    )
+
+    # Determine ticker(s)
+    def ticker_list():
+        if ticker:
+            return [ticker]
+        import yaml
+        PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        TICKER_YAML = os.path.join(PROJECT_ROOT, "tickers.yaml")
+        with open(TICKER_YAML, "r") as f:
+            tickers = yaml.safe_load(f)
+        cats = ["stocks", "etfs"]
+        return [sym for cat in cats for sym in tickers.get(cat, [])]
+
+    fetch_all_options(
+        output_dir=output_dir,
+        min_days_out=min_dte,
+        max_days_out=max_dte,
+        option_type=option_type,
+        symbols=ticker_list()
+    )
+    print(f"[✓] Options data saved to {output_dir}/<TICKER>.csv")
+
+# ========================== REST OF CLI ==========================
 @cli.command(name="clean")
 @click.option("--force", is_flag=True, help="Force overwrite existing clean files")
 def clean_cmd(force):
@@ -122,7 +221,6 @@ def merge_cmd(target, ticker, interval):
         else:
             from stonkslib.merge.by_patterns import run_merge_patterns
             run_merge_patterns()
-
 
 @cli.command(name="backtest")
 @click.option(

@@ -8,7 +8,7 @@ Supports overlays for Bollinger Bands, moving averages, and more, with a simple 
 ## Features
 
 - Candlestick charting for any asset and interval (minute, hourly, daily, weekly)
-- Overlay indicators (Bollinger Bands, Double/Triple MAs, etc) with checkboxes
+- Overlay indicators (Bollinger Bands, Double/Triple MAs, etc.) with checkboxes
 - Adjustable candle scaling for better pattern visibility
 - Debug/data panel for troubleshooting
 - Clean, extensible Python and Streamlit codebase
@@ -111,8 +111,10 @@ MIT License (see LICENSE file)
 **Questions or improvements?**  
 Open an issue or submit a pull request!
 
+---
 
 ## Folder Structure
+
 
 ```
 
@@ -177,7 +179,7 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 | `1wk`    | Weekly OHLC     | Full history        | Full history         |
 | `1mo`    | Monthly OHLC    | Full history        | Full history         |
 
-```
+---
 
 ## Ziping the project
 zip -r stonks_clean.zip stonks \

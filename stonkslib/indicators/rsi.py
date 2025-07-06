@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
+
 def rsi(df, period=14):
     """
     Calculate RSI (Relative Strength Index) for a DataFrame (expects 'Close' column).
@@ -29,10 +30,38 @@ def rsi(df, period=14):
     rs = avg_gain / avg_loss
     rsi_series = 100 - (100 / (1 + rs))
 
-    # To ensure alignment with the input df's index:
+    # Align with original index
     rsi_series = rsi_series.reindex(df.index)
 
     return rsi_series
+
+
+def generate_rsi_signals(series):
+    """
+    Generate RSI signals for overbought/oversold.
+    Expects a Series (not a DataFrame).
+    """
+    if isinstance(series, pd.DataFrame):
+        if series.shape[1] != 1:
+            raise ValueError("generate_rsi_signals expects a Series or single-column DataFrame")
+        series = series.iloc[:, 0]
+
+    signals = []
+    for i in range(1, len(series)):
+        rsi_val = series.iloc[i]
+        signal = ""
+        if rsi_val > 70:
+            signal = "🔼 Overbought"
+        elif rsi_val < 30:
+            signal = "🔽 Oversold"
+        signals.append(signal)
+
+    df = pd.DataFrame({
+        "RSI": series.iloc[1:],
+        "Signal": signals
+    })
+    return df[df["Signal"] != ""]
+
 
 # Manual test
 if __name__ == "__main__":
@@ -43,15 +72,9 @@ if __name__ == "__main__":
     df = load_td([ticker], interval)[ticker]
     rsi_series = rsi(df, period=14)
 
-    df["RSI"] = rsi_series
-    rsi_df = df.dropna(subset=["RSI"])
+    rsi_signals = generate_rsi_signals(rsi_series)
 
-    if rsi_df.empty:
-        print(f"[!] Not enough data to compute RSI for {ticker} ({interval})")
+    if rsi_signals.empty:
+        print("No RSI signals")
     else:
-        latest = rsi_df.iloc[-1]
-        direction = "🔼 Overbought" if latest["RSI"] > 70 else (
-                    "🔽 Oversold" if latest["RSI"] < 30 else "➡️ Neutral")
-
-        print(rsi_df.tail(10)[["Close", "RSI"]])
-        print(f"\n{direction} — Latest RSI: {latest['RSI']:.2f}")
+        print(rsi_signals.tail())

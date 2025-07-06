@@ -1,5 +1,3 @@
-# stonkslib/fetch/data.py
-
 import os
 import sys
 import yaml
@@ -9,14 +7,14 @@ from pathlib import Path
 import warnings
 
 from stonkslib.fetch.guard import needs_update
-from stonkslib.fetch.ranges import CATEGORY_INTERVALS, FRESHNESS_MAP
+from stonkslib.fetch.ranges import CATEGORY_INTERVALS
 
 # Suppress warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
 
 
-def fetch_all(yaml_file="tickers.yaml", data_dir="data", force=False):
+def fetch_all(yaml_file="tickers.yaml", data_dir="data", force=False, tickers=None, category=None):
     base_dir = Path.cwd() if getattr(sys, 'frozen', False) else Path(__file__).resolve().parents[2]
     yaml_path = base_dir / yaml_file
     raw_data_path = base_dir / data_dir / "ticker_data" / "raw"
@@ -24,15 +22,39 @@ def fetch_all(yaml_file="tickers.yaml", data_dir="data", force=False):
     with open(yaml_path, "r") as f:
         all_tickers = yaml.safe_load(f)
 
-    for category, tickers in all_tickers.items():
-        intervals = CATEGORY_INTERVALS.get(category, [("1d", "1y")])
+    # Debugging: Print categories available
+    print(f"Available categories in YAML: {all_tickers.keys()}")
 
-        for ticker in tickers:
+    # If a list of tickers is explicitly given, fetch only those, using "stocks" intervals by default
+    if tickers is not None:
+        target_tickers = tickers
+        # Guess the category, fallback to stocks
+        intervals = CATEGORY_INTERVALS.get(category or "stocks", [("1d", "1y")])
+        cats = [category or "stocks"]
+    elif category:
+        # If category is provided, fetch only that category
+        cats = [category]
+    else:
+        # If no category is provided, fetch from all categories
+        cats = all_tickers.keys()
+
+    # Debugging: Print tickers being loaded
+    for cat in cats:
+        print(f"Loading {cat} category...")
+        if tickers is not None:
+            these_tickers = target_tickers
+        else:
+            these_tickers = all_tickers.get(cat, [])
+
+        print(f"Loading {cat} tickers: {these_tickers}")  # Debugging line
+        intervals = CATEGORY_INTERVALS.get(cat, [("1d", "1y")])
+
+        for ticker in these_tickers:
             for interval, period in intervals:
                 interval_str = str(interval)
                 csv_path = raw_data_path / interval_str / f"{ticker}.csv"
 
-                if not force and not needs_update(csv_path, interval_str): # Does not send API requests
+                if not force and not needs_update(csv_path, interval_str):
                     if csv_path.exists():
                         try:
                             existing = pd.read_csv(csv_path, index_col=0)
@@ -49,7 +71,6 @@ def fetch_all(yaml_file="tickers.yaml", data_dir="data", force=False):
 
                 print(f"[↑] Fetching {ticker} ({interval_str}, {period})...")
                 try:
-                    # Patch for Yahoo interval naming (e.g. 1h → 60m)
                     yf_interval = {"1h": "60m"}.get(interval_str, interval_str)
                     df = yf.download(ticker, interval=interval_str, period=period, progress=False)
                     if not df.empty:

@@ -4,10 +4,10 @@ import yaml
 import os
 import pandas as pd
 
-from stonkslib.indicators.bollinger import bollinger_bands
-from stonkslib.indicators.macd import macd
-from stonkslib.indicators.obv import obv
-from stonkslib.indicators.rsi import rsi
+from stonkslib.indicators.bollinger import bollinger_bands, generate_bollinger_signals
+from stonkslib.indicators.macd import macd, generate_macd_signals
+from stonkslib.indicators.obv import obv, generate_obv_signals
+from stonkslib.indicators.rsi import rsi, generate_rsi_signals
 from stonkslib.indicators.moving_avg_double import moving_averages, generate_ma_signals
 from stonkslib.indicators.moving_avg_triple import moving_averages_triple, generate_triple_ma_signals
 from stonkslib.indicators.fibonacci import calculate_fibonacci_levels, generate_fibonacci_signals
@@ -66,6 +66,8 @@ def aggregate_and_save(ticker, interval):
 
     try:
         df = load_td([ticker], interval)[ticker]
+        if "Close" not in df.columns:
+            raise ValueError("Missing 'Close' column in loaded data")
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Data load error: {e}")
         for key in ["rsi", "macd", "bollinger", "obv", "ma_double", "ma_triple", "fibonacci"]:
@@ -74,10 +76,13 @@ def aggregate_and_save(ticker, interval):
 
     # --- RSI ---
     try:
-        rsi_df = pd.DataFrame(index=df.index)
         for p in [5, 7, 14]:
-            rsi_df[f"RSI_{p}"] = rsi(df, period=p)
-        save_csv(rsi_df, ticker, interval, "rsi")
+            series = rsi(df.copy(), period=p)
+            rsi_df = pd.DataFrame({f"RSI_{p}": series})
+            save_csv(rsi_df, ticker, interval, f"rsi_{p}")
+            rsi_signals = generate_rsi_signals(series)
+            if not rsi_signals.empty:
+                save_csv(rsi_signals, ticker, interval, f"rsi_{p}_signals")
         status["rsi"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] RSI error: {e}")
@@ -86,10 +91,16 @@ def aggregate_and_save(ticker, interval):
     # --- MACD ---
     try:
         macd_df = pd.DataFrame(index=df.index)
+        all_signals = pd.DataFrame()
         for fast, slow, sig in [(5, 13, 4), (6, 19, 3), (12, 26, 9)]:
             out = macd(df.copy(), short_window=fast, long_window=slow, signal_window=sig)
             macd_df[f"MACD_{fast}_{slow}_{sig}"] = out["MACD"]
+            sigs = generate_macd_signals(out)
+            if not sigs.empty:
+                all_signals = pd.concat([all_signals, sigs])
         save_csv(macd_df, ticker, interval, "macd")
+        if not all_signals.empty:
+            save_csv(all_signals, ticker, interval, "macd_signals")
         status["macd"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] MACD error: {e}")
@@ -98,11 +109,17 @@ def aggregate_and_save(ticker, interval):
     # --- Bollinger Bands ---
     try:
         bb_df = pd.DataFrame(index=df.index)
+        signals_df = pd.DataFrame()
         for win, std in [(10, 1.5), (20, 2), (30, 2.5)]:
             bands = bollinger_bands(df.copy(), window=win, num_std_dev=std)
             bb_df[f"BB_upper_{win}_{std}"] = bands["Upper_Band"]
             bb_df[f"BB_lower_{win}_{std}"] = bands["Lower_Band"]
+            breakout_signals = generate_bollinger_signals(bands)
+            if not breakout_signals.empty:
+                signals_df = pd.concat([signals_df, breakout_signals], axis=0)
         save_csv(bb_df, ticker, interval, "bollinger")
+        if not signals_df.empty:
+            save_csv(signals_df[["Close", "Signal"]], ticker, interval, "bollinger_signals")
         status["bollinger"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Bollinger error: {e}")
@@ -112,6 +129,9 @@ def aggregate_and_save(ticker, interval):
     try:
         obv_df = obv(df.copy())
         save_csv(obv_df, ticker, interval, "obv")
+        obv_signals = generate_obv_signals(obv_df)
+        if not obv_signals.empty:
+            save_csv(obv_signals, ticker, interval, "obv_signals")
         status["obv"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] OBV error: {e}")
@@ -144,14 +164,12 @@ def aggregate_and_save(ticker, interval):
         fib_data = calculate_fibonacci_levels(df, lookback=100)
         if fib_data:
             raw_signals = generate_fibonacci_signals(df, fib_data, ticker=ticker, interval=interval)
-
             if not raw_signals.empty:
                 fib_signals = raw_signals[["Close", "Signal"]].rename(
                     columns={"Close": "fibonacci_Close", "Signal": "fibonacci_Signal"}
                 )
                 fib_signals = fib_signals.tail(5)
                 save_csv(fib_signals, ticker, interval, "fibonacci")
-
         status["fibonacci"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Fibonacci error: {e}")
