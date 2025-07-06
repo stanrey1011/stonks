@@ -179,9 +179,12 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 | `1wk`    | Weekly OHLC     | Full history        | Full history         |
 | `1mo`    | Monthly OHLC    | Full history        | Full history         |
 
----
+```
 
 ## Ziping the project
+
+```
+
 zip -r stonks_clean.zip stonks \
   -x "stonks/venv/*" \
   -x "stonks/__pycache__/*" \
@@ -191,7 +194,11 @@ zip -r stonks_clean.zip stonks \
   -x "stonks/dev/*" \
   -x "stonks/data/*"
 
+```
+
 ## Other Notes
+
+```
 
 tree -I "venv|__pycache__|*.egg-info" -L 2
 
@@ -200,3 +207,5 @@ tree -I "venv|__pycache__|*.egg-info" -L 2
 3. stonks clean - clean and standardize raw ticker data (data/ticker_data/clean/{interval}/{ticker}.csv)
 4. stonks analyze - runs clean ticker through indicators and pattern detection (data/analysis/signals/{ticker}/{interval}/{source}.csv)
 5. stonks merge - combines all indicators and patterns into a single csv (data/analysis/signals/{ticker}/{interval}/{source}.csv)
+
+```
