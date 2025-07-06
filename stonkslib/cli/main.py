@@ -1,9 +1,10 @@
+# stonkslib/cli/main.py
 import click
-from .fetch import fetch
-from .clean import clean
-from .analyze import analyze
-from .merge import merge
-from .backtest import backtest
+from stonkslib.cli.fetch import fetch  # Correct path
+from stonkslib.cli.clean import clean
+from stonkslib.cli.analyze import analyze
+from stonkslib.cli.merge import merge
+from stonkslib.cli.backtest import backtest
 
 @click.group()
 def cli():
@@ -16,5 +17,4 @@ cli.add_command(merge)
 cli.add_command(backtest)
 
 if __name__ == "__main__":
-    # Enable Click shell completion support
     cli(auto_envvar_prefix="STONKS", standalone_mode=True)

@@ -1,45 +1,73 @@
 # stonkslib/backtest/head_shoulders.py
-
 import os
 import pandas as pd
 from pathlib import Path
 import logging
+import yaml
+import json
+from stonkslib.utils.logging import setup_logging
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
+# Load configuration
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PATTERN_BASE = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-patterns"
-PRICE_BASE = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-indicators"
-OUTPUT_BASE = PROJECT_ROOT / "data" / "analysis" / "backtests" / "patterns" / "head_shoulders"
-OUTPUT_BASE.mkdir(parents=True, exist_ok=True)
+CONFIG_PATH = PROJECT_ROOT / "config.yaml"
+
+# Setup logging (fallback)
+logger = setup_logging(PROJECT_ROOT / "log", "head_shoulders.log")
+
+# Load config.yaml with error handling
+try:
+    with open(CONFIG_PATH, "r") as f:
+        config = yaml.safe_load(f)
+    if config is None:
+        raise ValueError("config.yaml is empty or invalid")
+except FileNotFoundError:
+    logger.error(f"[!] Config file not found at {CONFIG_PATH}")
+    config = {"project": {"ticker_data_dir": "data/ticker_data/raw", "options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
+except Exception as e:
+    logger.error(f"[!] Error loading config.yaml: {e}")
+    config = {"project": {"ticker_data_dir": "data/ticker_data/raw", "options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
+
+PATTERN_BASE = PROJECT_ROOT / config["project"]["ticker_data_dir"] / "analysis" / "merged" / "by-patterns"
+PRICE_BASE = PROJECT_ROOT / config["project"]["ticker_data_dir"] / "analysis" / "merged" / "by-indicators"
+OPTIONS_BASE = PROJECT_ROOT / config["project"]["options_data_dir"]
+OUTPUT_BASE = PROJECT_ROOT / config["project"]["backtest_dir"] / "patterns" / "head_shoulders"
+
+# Re-setup logging
+logger = setup_logging(PROJECT_ROOT / config["project"]["log_dir"], "head_shoulders.log")
 
 CONFIDENCE_THRESHOLD = 0.5
 START_CASH = 10_000
 RISK_PER_TRADE = 0.2
 
-def backtest_head_shoulders(ticker, interval):
-    pattern_path = PATTERN_BASE / ticker / f"{interval}.csv"
-    price_path = PRICE_BASE / ticker / f"{interval}.csv"
+def backtest_file(filepath, outpath, strat_config, ticker):
+    pattern_path = Path(filepath)
+    price_path = PRICE_BASE / ticker / f"{Path(filepath).stem}.csv"
     if not pattern_path.exists() or not price_path.exists():
-        logging.warning(f"[!] Missing pattern or price: {pattern_path}, {price_path}")
+        logger.warning(f"[!] Missing pattern or price: {pattern_path}, {price_path}")
         return
 
     patterns = pd.read_csv(pattern_path, index_col=0, parse_dates=True)
     prices = pd.read_csv(price_path, index_col=0, parse_dates=True)
     if "Close" not in prices.columns:
-        logging.warning(f"[!] No 'Close' price in {price_path.name}; skipping.")
+        logger.warning(f"[!] No 'Close' price in {price_path.name}; skipping.")
         return
+
+    options_path = OPTIONS_BASE / strat_config["output_dir"] / f"{ticker}.csv"
+    options_df = pd.read_csv(options_path) if options_path.exists() else pd.DataFrame()
 
     cash = START_CASH
     pos = 0
     entry_price = None
     trades = []
 
+    min_dte = strat_config.get("min_dte", 21)
+    max_dte = strat_config.get("max_dte", 9999)
+    option_type = strat_config.get("option_type", "calls")
+
     for i, row in patterns.iterrows():
-        # Look for the head_shoulders pattern/columns
         pattern = None
         conf = None
-        for prefix in ["head_shoulders_", ""]:
+        for prefix in ["head(world)_shoulders_", ""]:
             pattern_col = f"{prefix}pattern"
             conf_col = f"{prefix}confidence"
             if pattern_col in row and conf_col in row:
@@ -50,56 +78,75 @@ def backtest_head_shoulders(ticker, interval):
         if pd.isna(pattern) or pd.isna(conf) or float(conf) < CONFIDENCE_THRESHOLD:
             continue
 
-        # Only act if pattern is found
         trade_time = i if not isinstance(i, int) else row.get("Date", None)
         if pd.isna(trade_time):
             continue
-        close = prices["Close"].get(trade_time, None)
+
+        if not options_df.empty:
+            current_date = pd.to_datetime(trade_time).date()
+            options_subset = options_df[
+                (pd.to_datetime(options_df["expirationDate"]).dt.date >= current_date) &
+                (options_df["daysToExpiration"] >= min_dte) &
+                (options_df["daysToExpiration"] <= max_dte) &
+                (options_df["optionType"] == option_type)
+            ]
+            close = options_subset["lastPrice"].mean() if not options_subset.empty else prices["Close"].get(trade_time, None)
+        else:
+            close = prices["Close"].get(trade_time, None)
+
         if pd.isna(close):
             continue
 
-        # SELL on "Head and Shoulders"
-        if pattern == "Head and Shoulders":
-            if pos > 0:
-                cash += pos * close
-                trades.append({"action": "SELL", "date": trade_time, "price": close, "size": pos, "cash": cash,
-                               "pattern": pattern, "conf": conf, "pnl": (close - entry_price) * pos})
-                pos = 0
-                entry_price = None
-        # Optionally: BUY on "Inverse Head and Shoulders"
-        elif pattern == "Inverse Head and Shoulders":  # if you ever implement
-            if pos == 0:
-                size = int((cash * RISK_PER_TRADE) // close)
-                if size > 0:
-                    pos = size
-                    entry_price = close
-                    cash -= pos * close
-                    trades.append({"action": "BUY", "date": trade_time, "price": close, "size": pos, "cash": cash,
-                                   "pattern": pattern, "conf": conf})
+        if pattern == "Head and Shoulders" and pos > 0:
+            cash += pos * close
+            trades.append({"action": "SELL", "date": trade_time, "price": close, "size": pos, "cash": cash,
+                           "pattern": pattern, "conf": conf, "pnl": (close - entry_price) * pos})
+            pos = 0
+            entry_price = None
+        elif pattern == "Inverse Head and Shoulders" and pos == 0:
+            size = int((cash * RISK_PER_TRADE) // close)
+            if size > 0:
+                pos = size
+                entry_price = close
+                cash -= pos * close
+                trades.append({"action": "BUY", "date": trade_time, "price": close, "size": pos, "cash": cash,
+                               "pattern": pattern, "conf": conf})
 
-    # Liquidate at end
     if pos > 0:
         last_price = prices["Close"].iloc[-1]
         cash += pos * last_price
         trades.append({"action": "SELL_END", "date": prices.index[-1], "price": last_price, "size": pos, "cash": cash,
-                       "pnl": (last_price-entry_price)*pos})
+                       "pnl": (last_price - entry_price) * pos})
 
-    # Output
     results_df = pd.DataFrame(trades)
-    out_dir = OUTPUT_BASE / ticker
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_file = out_dir / f"{interval}.csv"
-    results_df.to_csv(out_file, index=False)
+    outpath.parent.mkdir(parents=True, exist_ok=True)
+    results_df.to_csv(outpath, index=False)
+
     total_pnl = results_df.get("pnl", pd.Series([0])).sum()
-    logging.info(f"[✓] Backtest complete: {ticker} ({interval}) → {out_file}")
-    logging.info(f"    Final cash: {cash:.2f}, Net P&L: {total_pnl:.2f}, Trades: {len(results_df)//2}")
+    result = {
+        "symbol": ticker,
+        "strategy": strat_config.get("name", "head_shoulders"),
+        "metrics": {"final_cash": cash, "net_pnl": total_pnl, "trades": len(results_df) // 2}
+    }
+    json_outpath = OUTPUT_BASE / f"{strat_config.get('name', 'head_shoulders')}_{ticker}.json"
+    json_outpath.parent.mkdir(parents=True, exist_ok=True)
+    with open(json_outpath, "w") as f:
+        json.dump(result, f)
+    logger.info(f"[✓] Backtest complete: {ticker} ({Path(filepath).stem}) → {outpath}, JSON: {json_outpath}")
+    logger.info(f"    Final cash: {cash:.2f}, Net P&L: {total_pnl:.2f}, Trades: {len(results_df)//2}")
 
-def run_all_backtests(strategy=None):
-    intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
-    tickers = [d.name for d in PATTERN_BASE.iterdir() if d.is_dir()]
-    for ticker in tickers:
-        for interval in intervals:
-            backtest_head_shoulders(ticker, interval)
-
-if __name__ == "__main__":
-    run_all_backtests()
+def run_all_backtests(df=None, strat_config=None, ticker=None, output_dir=OUTPUT_BASE):
+    if df is not None and ticker is not None and strat_config is not None:
+        outdir = output_dir / ticker
+        outdir.mkdir(parents=True, exist_ok=True)
+        outpath = outdir / f"{strat_config.get('name', 'head_shoulders')}.csv"
+        backtest_file(df, outpath, strat_config, ticker)
+    else:
+        intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
+        tickers = [d.name for d in PATTERN_BASE.iterdir() if d.is_dir()]
+        for ticker in tickers:
+            for interval in intervals:
+                pattern_file = PATTERN_BASE / ticker / f"{interval}.csv"
+                outdir = output_dir / ticker
+                outpath = outdir / f"{interval}.csv"
+                backtest_file(pattern_file, outpath, strat_config or {}, ticker)

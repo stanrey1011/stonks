@@ -1,6 +1,11 @@
+import os
 import click
+import yaml
+import pandas as pd
+import json
+from pathlib import Path
 from stonkslib.utils.load_strategy import load_strategy_config
-
+from stonkslib.utils.logging import setup_logging
 from stonkslib.backtest.indicators import run_all_backtests as backtest_indicators
 try:
     from stonkslib.backtest.doubles import run_all_backtests as backtest_doubles
@@ -19,6 +24,33 @@ try:
 except ImportError:
     backtest_wedges = None
 
+# Load configuration
+PROJECT_ROOT = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+CONFIG_PATH = PROJECT_ROOT / "config.yaml"
+
+# Setup logging (fallback)
+logger = setup_logging(PROJECT_ROOT / "log", "backtest.log")
+
+# Load config.yaml with error handling
+try:
+    with open(CONFIG_PATH, "r") as f:
+        config = yaml.safe_load(f)
+    if config is None:
+        raise ValueError("config.yaml is empty or invalid")
+except FileNotFoundError:
+    logger.error(f"[!] Config file not found at {CONFIG_PATH}")
+    config = {"project": {"options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
+except Exception as e:
+    logger.error(f"[!] Error loading config.yaml: {e}")
+    config = {"project": {"options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
+
+OPTIONS_DATA_DIR = PROJECT_ROOT / config["project"]["options_data_dir"]
+BACKTEST_DIR = PROJECT_ROOT / config["project"]["backtest_dir"]
+LOG_DIR = PROJECT_ROOT / config["project"]["log_dir"]
+
+# Re-setup logging with correct log_dir
+logger = setup_logging(LOG_DIR, "backtest.log")
+
 @click.command()
 @click.option(
     "--target",
@@ -30,34 +62,64 @@ except ImportError:
     "--config",
     type=click.Path(exists=True, dir_okay=False),
     default=None,
-    help="Path to strategy YAML config file (default: None for hardcoded backtest logic)",
+    help="Path to strategy YAML config file (default: use config.yaml strategies)",
 )
-def backtest(target, config):
+@click.option(
+    "--strategy",
+    type=click.Choice(["leaps", "covered_calls", "secured_puts"]),
+    default=None,
+    help="Strategy to backtest (default: all from config.yaml)",
+)
+@click.option("--ticker", type=str, default="AAPL", help="Ticker to backtest (default: AAPL)")
+def backtest(target, config, strategy, ticker):
     """Run backtests on merged data, using a strategy config if provided."""
-    strategy = None
-    if config:
-        print(f"[*] Loading strategy config: {config}")
-        strategy = load_strategy_config(config)
+    strategy_config = load_strategy_config(config) if config else None
+    strategies_to_run = [strategy] if strategy else config.get("strategies", {}).keys()
+
     ran = False
-    if target in ("all", "indicators"):
-        print("[*] Running indicator backtest...")
-        backtest_indicators(strategy)
-        ran = True
-    if target in ("all", "doubles") and backtest_doubles:
-        print("[*] Running doubles pattern backtest...")
-        backtest_doubles(strategy)
-        ran = True
-    if target in ("all", "triangles") and backtest_triangles:
-        print("[*] Running triangles pattern backtest...")
-        backtest_triangles(strategy)
-        ran = True
-    if target in ("all", "head_shoulders") and backtest_head_shoulders:
-        print("[*] Running head-shoulders pattern backtest...")
-        backtest_head_shoulders(strategy)
-        ran = True
-    if target in ("all", "wedges") and backtest_wedges:
-        print("[*] Running wedges pattern backtest...")
-        backtest_wedges(strategy)
-        ran = True
+    for strat in strategies_to_run:
+        strat_config = config.get("strategies", {}).get(strat, strategy_config)
+        if not strat_config:
+            logger.error(f"[!] No config for strategy {strat}, skipping...")
+            continue
+
+        data_path = OPTIONS_DATA_DIR / strat_config["output_dir"] / f"{ticker}.csv"
+        try:
+            df = pd.read_csv(data_path)
+        except FileNotFoundError:
+            logger.error(f"[!] No data found for {ticker} in {data_path}")
+            continue
+
+        if target in ("all", "indicators"):
+            logger.info(f"[*] Running indicator backtest for {strat} on {ticker}...")
+            backtest_indicators(df, strat_config, ticker, BACKTEST_DIR)
+            ran = True
+        if target in ("all", "doubles") and backtest_doubles:
+            logger.info(f"[*] Running doubles pattern backtest for {strat} on {ticker}...")
+            backtest_doubles(df, strat_config, ticker, BACKTEST_DIR)
+            ran = True
+        if target in ("all", "triangles") and backtest_triangles:
+            logger.info(f"[*] Running triangles pattern backtest for {strat} on {ticker}...")
+            backtest_triangles(df, strat_config, ticker, BACKTEST_DIR)
+            ran = True
+        if target in ("all", "head_shoulders") and backtest_head_shoulders:
+            logger.info(f"[*] Running head-shoulders pattern backtest for {strat} on {ticker}...")
+            backtest_head_shoulders(df, strat_config, ticker, BACKTEST_DIR)
+            ran = True
+        if target in ("all", "wedges") and backtest_wedges:
+            logger.info(f"[*] Running wedges pattern backtest for {strat} on {ticker}...")
+            backtest_wedges(df, strat_config, ticker, BACKTEST_DIR)
+            ran = True
+
+        if ran:
+            filtered = df[df["strike"] > 0]
+            returns = filtered["lastPrice"].sum() if not filtered.empty else 0
+            result = {"symbol": ticker, "strategy": strat, "metrics": {"returns": returns}}
+            output_file = BACKTEST_DIR / f"{strat}_{ticker}.json"
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_file, "w") as f:
+                json.dump(result, f)
+            logger.info(f"[✓] Backtest saved to {output_file}")
+
     if not ran:
-        print("[!] No backtest ran (perhaps module missing or typo in --target)")
+        logger.error("[!] No backtest ran (perhaps module missing or typo in --target)")

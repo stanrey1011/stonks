@@ -1,0 +1,67 @@
+project:
+  root: "."
+  ticker_yaml: "tickers.yaml"
+  ticker_data_dir: "data/ticker_data/raw"
+  options_data_dir: "data/options_data/raw"
+  processed_dir: "data/options_data/processed"
+  backtest_dir: "data/backtest_results"
+  log_dir: "log"
+  strategy_dir: "stonkslib/strategies"
+
+strategies:
+  leaps:
+    min_dte: 270
+    max_dte: 9999
+    option_type: "calls"
+    side: "buy"
+    output_dir: "calls/buy/leaps"
+  
+  covered_calls:
+    min_dte: 21
+    max_dte: 45
+    option_type: "calls"
+    side: "sell"
+    output_dir: "calls/sell/covered_calls"
+  
+  secured_puts:
+    min_dte: 21
+    max_dte: 45
+    option_type: "puts"
+    side: "sell"
+    output_dir: "puts/sell/secured_puts"
+  
+  # New Strategies
+  iron_condors:
+    min_dte: 21
+    max_dte: 45
+    option_type: "calls and puts"
+    side: "sell"
+    output_dir: "calls/sell/iron_condor"
+  
+  straddles:
+    min_dte: 21
+    max_dte: 45
+    option_type: "calls and puts"
+    side: "buy"
+    output_dir: "calls/buy/straddle"
+  
+  strangles:
+    min_dte: 21
+    max_dte: 45
+    option_type: "calls and puts"
+    side: "buy"
+    output_dir: "calls/buy/strangle"
+  
+  credit_spreads:
+    min_dte: 21
+    max_dte: 45
+    option_type: "calls and puts"
+    side: "sell"
+    output_dir: "calls/sell/credit_spread"
+  
+  calendar_spreads:
+    min_dte: 21
+    max_dte: 45
+    option_type: "calls and puts"
+    side: "buy"
+    output_dir: "calls/buy/calendar_spread"
