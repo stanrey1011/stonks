@@ -1,9 +1,18 @@
-# stonkslib/utils/clean_td.py
-
+import logging
 from pathlib import Path
 import pandas as pd
 
 COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
+
+# Setup logger for this module
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.hasHandlers():
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 # Resolve root directory automatically
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +25,7 @@ def clean_td(ticker, interval, force=False, verbose=True):
 
     if not raw_path.exists():
         if verbose:
-            print(f"[!] No raw data for {ticker} ({interval})")
+            logger.warning(f"No raw data for {ticker} ({interval})")
         return None
 
     try:
@@ -41,17 +50,17 @@ def clean_td(ticker, interval, force=False, verbose=True):
             df.index = df.index.tz_convert('UTC') if df.index.tz is not None else df.index.tz_localize('UTC')
 
         if df.empty or df.index[0].year < 1980:
-            print(f"[!] Data looks wrong after cleaning {ticker} ({interval})—please check your raw file!")
+            logger.warning(f"Data looks wrong after cleaning {ticker} ({interval})—please check your raw file!")
             return None
 
         clean_path.parent.mkdir(parents=True, exist_ok=True)
         if force or not clean_path.exists():
             df.to_csv(clean_path)
             if verbose:
-                print(f"[✔] Cleaned data written: {clean_path}")
+                logger.info(f"Cleaned data written: {clean_path}")
 
         return df
 
     except Exception as e:
-        print(f"[!] Cleaning failed for {ticker} ({interval}): {e}")
+        logger.error(f"Cleaning failed for {ticker} ({interval}): {e}")
         return None

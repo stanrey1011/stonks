@@ -1,6 +1,3 @@
-# pyproject.toml for stonks CLI – modern Python packaging
-# Recommended PEP 621 format, compatible with pip ≥ 21 and modern tools (e.g., Poetry, Hatch)
-
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -23,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-stonks = "stonkslib.stonks_cli:cli"
+stonks = "stonkslib.cli.main:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -98,7 +98,7 @@ Supports overlays for Bollinger Bands, moving averages, and more, with a simple 
 
 - All indicator/pattern scripts are modular and easy to extend (see `stonkslib/indicators/`, `stonkslib/patterns/`)
 - Strategies are YAML-based (see `stonkslib/strategies/`)
-- CLI commands are managed in `stonkslib/stonks_cli.py`
+- CLI commands are managed in `stonkslib/cli/` (modularized from old monolithic `stonks_cli.py`)
 
 ---
 
@@ -115,7 +115,6 @@ Open an issue or submit a pull request!
 
 ## Folder Structure
 
-
 ```
 
 stonks/ # 🧠 Root project folder (Git repo, README, setup files)
@@ -125,6 +124,7 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 │ ├── alerts/ # 🔔 Trade alert/notification logic
 │ ├── analysis/ # 📊 Signal generation/analysis scripts
 │ ├── backtest/ # 🔙 Backtesting engines & logic
+│ ├── cli/ # 🖥️ Modular CLI commands (fetch, clean, analyze, merge, backtest)
 │ ├── dash/ # 📉 Dash/Streamlit/Plotly dashboard UIs
 │ ├── execution/ # ⚙️ (Optional) Trade execution for brokers/APIs
 │ ├── fetch/ # 📡 Data fetching modules
@@ -137,7 +137,7 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 │ ├── strategies/ # 🧾 YAML strategy configs (user-editable)
 │ ├── trading_logic/ # 🔀 Rules-based or template strategies
 │ ├── utils/ # 🧰 Helper modules (clean_td, load_td, etc.)
-│ └── stonks_cli.py # 🖥️ Main CLI entry (stonks command)
+│ └── stonks_cli.py # 🖥️ Main CLI entry (now modularized in cli/)
 │
 ├── data/ # 📦 Project data (usually in .gitignore)
 │ ├── ticker_data/
@@ -150,17 +150,14 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 │ └── charts/ # (Optional) Example chart images, visualizations, pattern samples
 │
 ├── dev/ # 🧪 Dev scripts, migration helpers, experiments
-│ ├── restructure.py
-│ ├── sanity_check.sh
-│ └── ... # Other dev/test scripts
 │
-├── tickers.yaml # 📋 Your only config file — list of tickers/crypto/etfs to fetch
+├── tickers.yaml # 📋 Your config file — list of tickers/crypto/etfs to fetch
 ├── requirements.txt # 📦 List of Python package dependencies
-├── README.md # 📘 Main usage instructions and intro (this file!)
-├── .gitignore # 🔒 Ignores pycache, .egg-info/, venv/, and data folders
-├── pyproject.toml # 🛠️ Python project/build tool config (optional but modern)
-├── setup.py # 🛠️ Legacy Python setup for pip install (if needed)
-└── venv/ # 🐍 Local Python virtualenv (never committed to Git)
+├── README.md # 📘 This file!
+├── .gitignore # 🔒 Ignores pycache, venv/, data folders
+├── pyproject.toml # 🛠️ Python project/build tool config
+├── setup.py # 🛠️ Legacy setup (if needed)
+└── venv/ # 🐍 Local Python virtualenv (never committed)
 
 ```
 
@@ -183,8 +180,7 @@ stonks/ # 🧠 Root project folder (Git repo, README, setup files)
 
 ## Ziping the project
 
-```
-
+```sh
 zip -r stonks_clean.zip stonks \
   -x "stonks/venv/*" \
   -x "stonks/__pycache__/*" \
@@ -192,6 +188,7 @@ zip -r stonks_clean.zip stonks \
   -x "stonks/**/*.pyc" \
   -x "stonks/.git/*" \
   -x "stonks/dev/*" \
+  -x "stonks/data/*"
   -x "stonks/data/*"
 
 ```

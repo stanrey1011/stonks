@@ -1,4 +1,3 @@
-# stonkslib/fetch/options/buy/calls/leaps.py
 import os
 import logging
 import pandas as pd
@@ -6,12 +5,12 @@ import yfinance as yf
 import yaml
 
 # --- Config ---
-MIN_DTE = 270
+MIN_DTE = 7
+MAX_DTE = 45
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
 TICKER_YAML = os.path.join(PROJECT_ROOT, "tickers.yaml")
 
-# Save to analysis directory, organized for LLM
-ANALYSIS_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "data", "analysis", "options", "calls", "buy")
+ANALYSIS_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "data", "analysis", "options", "calls", "sell")
 
 # --- Logging ---
 LOG_DIR = os.path.join(PROJECT_ROOT, "log")
@@ -20,13 +19,12 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, "fetch_leaps.log")),
+        logging.FileHandler(os.path.join(LOG_DIR, "fetch_covered_calls.log")),
         logging.StreamHandler()
     ]
 )
 
-# --- Fetching ---
-def fetch_option_chain(ticker, min_days_out=MIN_DTE):
+def fetch_option_chain(ticker, min_days_out=MIN_DTE, max_days_out=MAX_DTE):
     try:
         ticker_obj = yf.Ticker(ticker)
         expirations = ticker_obj.options
@@ -39,16 +37,15 @@ def fetch_option_chain(ticker, min_days_out=MIN_DTE):
 
         for exp in expirations:
             try:
-                # Parse expiration as naive date, then localize to UTC
                 exp_date = pd.to_datetime(exp, errors='coerce').tz_localize(None).tz_localize('UTC')
                 if pd.isna(exp_date):
                     logging.warning(f"[!] Invalid expiration date for {ticker}: {exp}")
                     continue
 
                 days_diff = (exp_date - now_utc).days
-                logging.debug(f"[DEBUG] {ticker} expiration: {exp_date}, days: {days_diff}")
+                logging.debug(f"[DEBUG] {ticker} expiration: {exp_date}, days to expiration: {days_diff}")
 
-                if days_diff >= min_days_out:
+                if min_days_out <= days_diff <= max_days_out:
                     opt = ticker_obj.option_chain(exp)
                     calls_df = opt.calls.copy()
                     calls_df["expirationDate"] = exp_date
@@ -65,7 +62,7 @@ def fetch_option_chain(ticker, min_days_out=MIN_DTE):
         logging.error(f"[!] Failed to fetch options for {ticker}: {e}")
         return pd.DataFrame()
 
-def fetch_all_leaps():
+def fetch_all_covered_calls():
     try:
         with open(TICKER_YAML, "r") as f:
             tickers = yaml.safe_load(f) or {}
@@ -85,12 +82,12 @@ def fetch_all_leaps():
         if not df.empty:
             outdir = os.path.join(ANALYSIS_OUTPUT_DIR, symbol)
             os.makedirs(outdir, exist_ok=True)
-            outfile = os.path.join(outdir, "leaps.csv")
+            outfile = os.path.join(outdir, "covered_calls.csv")
             df.to_csv(outfile, index=False)
-            logging.info(f"[✓] Saved LEAPS for {symbol} → {outfile} ({len(df)} rows)")
+            logging.info(f"[✓] Saved covered calls for {symbol} → {outfile} ({len(df)} rows)")
         else:
-            logging.info(f"[✗] No LEAPS saved for {symbol}")
+            logging.info(f"[✗] No covered calls saved for {symbol}")
 
 # --- CLI Safe Entrypoint ---
 if __name__ == "__main__":
-    fetch_all_leaps()
+    fetch_all_covered_calls()
