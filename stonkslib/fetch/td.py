@@ -1,4 +1,3 @@
-# stonkslib/fetch/data.py
 import os
 import sys
 import yaml
@@ -6,8 +5,12 @@ import pandas as pd
 import yfinance as yf
 from pathlib import Path
 import warnings
-from .guard import needs_update
-from .ranges import CATEGORY_INTERVALS
+import time
+
+# Fix import path for guard.py and ranges.py
+sys.path.append(str(Path(__file__).resolve().parent))
+from guard import needs_update
+from ranges import CATEGORY_INTERVALS
 from stonkslib.utils.logging import setup_logging
 
 # Suppress warnings
@@ -16,15 +19,33 @@ warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer
 
 # Load configuration
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-with open(PROJECT_ROOT / "config.yaml", "r") as f:
-    config = yaml.safe_load(f)
+CONFIG_PATH = PROJECT_ROOT / "config.yaml"
+
+# Setup logging (fallback)
+logger = setup_logging(PROJECT_ROOT / "log", "fetch.log")
+
+# Load config.yaml with error handling
+try:
+    with open(CONFIG_PATH, "r") as f:
+        config = yaml.safe_load(f)
+    if config is None:
+        raise ValueError("config.yaml is empty or invalid")
+except FileNotFoundError:
+    logger.error(f"[!] Config file not found at {CONFIG_PATH}")
+    config = {"project": {"ticker_data_dir": "data/ticker_data/raw", "log_dir": "log"}}
+except Exception as e:
+    logger.error(f"[!] Error loading config.yaml: {e}")
+    config = {"project": {"ticker_data_dir": "data/ticker_data/raw", "log_dir": "log"}}
+
+TICKER_RAW_DIR = PROJECT_ROOT / config["project"]["ticker_data_dir"]
 TICKER_YAML = PROJECT_ROOT / config["project"]["ticker_yaml"]
-RAW_DATA_PATH = PROJECT_ROOT / config["project"]["ticker_data_dir"]
+LOG_DIR = PROJECT_ROOT / config["project"]["log_dir"]
 
-# Setup logging
-logger = setup_logging(PROJECT_ROOT / config["project"]["log_dir"], "data.log")
+# Re-setup logging
+logger = setup_logging(LOG_DIR, "fetch.log")
 
-def fetch_all(yaml_file=TICKER_YAML, data_dir=RAW_DATA_PATH, force=False, tickers=None, category=None):
+def fetch_all(yaml_file=TICKER_YAML, data_dir=TICKER_RAW_DIR, force=False, tickers=None, category=None):
+    """Fetch stock data and save to ticker-centric directory structure."""
     yaml_path = Path(yaml_file)
     raw_data_path = Path(data_dir)
     with open(yaml_path, "r") as f:
@@ -52,7 +73,7 @@ def fetch_all(yaml_file=TICKER_YAML, data_dir=RAW_DATA_PATH, force=False, ticker
         for ticker in these_tickers:
             for interval, period in intervals:
                 interval_str = str(interval)
-                csv_path = raw_data_path / interval_str / f"{ticker}.csv"
+                csv_path = raw_data_path / ticker / f"{interval_str}.csv"
 
                 if not force and not needs_update(csv_path, interval_str):
                     if csv_path.exists():
@@ -95,6 +116,8 @@ def fetch_all(yaml_file=TICKER_YAML, data_dir=RAW_DATA_PATH, force=False, ticker
                             logger.info(f"[✓] Appended {len(new_rows)} rows to {ticker} → {interval_str}, latest: {df.index[-1]})")
                     else:
                         logger.warning(f"[!] No data for {ticker} ({interval_str})")
+                    # Add delay to avoid hitting yfinance rate limits
+                    time.sleep(0.5)  # 0.5 seconds per request
                 except Exception as e:
                     logger.error(f"[!] Error fetching {ticker} ({interval_str}): {e}")
 
