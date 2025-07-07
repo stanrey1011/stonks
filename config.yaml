@@ -12,56 +12,69 @@ strategies:
   leaps:
     min_dte: 270
     max_dte: 9999
-    option_type: "calls"
-    side: "buy"
-    output_dir: "calls/buy/leaps"
-  
+    option_type: calls
+    side: buy
+    output_dir: calls/buy/leaps
+    min_volume: 1
+    min_open_interest: 1
   covered_calls:
     min_dte: 21
     max_dte: 45
-    option_type: "calls"
-    side: "sell"
-    output_dir: "calls/sell/covered_calls"
-  
+    option_type: calls
+    side: sell
+    output_dir: calls/sell/covered_calls
+    min_volume: 1
+    min_open_interest: 1
   secured_puts:
     min_dte: 21
     max_dte: 45
-    option_type: "puts"
-    side: "sell"
-    output_dir: "puts/sell/secured_puts"
-  
-  # New Strategies
+    option_type: puts
+    side: sell
+    output_dir: puts/sell/secured_puts
+    min_volume: 1
+    min_open_interest: 1
   iron_condors:
     min_dte: 21
     max_dte: 45
-    option_type: "calls and puts"
-    side: "sell"
-    output_dir: "calls/sell/iron_condor"
-  
+    option_type: calls and puts
+    side: sell
+    output_dir: calls/sell/iron_condor
+    strike_spread: 15.0
+    min_volume: 1
+    min_open_interest: 1
   straddles:
     min_dte: 21
     max_dte: 45
-    option_type: "calls and puts"
-    side: "buy"
-    output_dir: "calls/buy/straddle"
-  
+    option_type: calls and puts
+    side: buy
+    output_dir: calls/buy/straddle
+    same_strike: true
+    min_volume: 1
+    min_open_interest: 1
   strangles:
     min_dte: 21
     max_dte: 45
-    option_type: "calls and puts"
-    side: "buy"
-    output_dir: "calls/buy/strangle"
-  
+    option_type: calls and puts
+    side: buy
+    output_dir: calls/buy/strangle
+    strike_spread: 15.0
+    min_volume: 1
+    min_open_interest: 1
   credit_spreads:
     min_dte: 21
     max_dte: 45
-    option_type: "calls and puts"
-    side: "sell"
-    output_dir: "calls/sell/credit_spread"
-  
+    option_type: calls
+    side: sell
+    output_dir: calls/sell/credit_spread
+    strike_spread: 5.0
+    min_volume: 1
+    min_open_interest: 1
   calendar_spreads:
-    min_dte: 21
-    max_dte: 45
-    option_type: "calls and puts"
-    side: "buy"
-    output_dir: "calls/buy/calendar_spread"
+    min_dte: 30
+    max_dte: 365
+    option_type: calls
+    side: buy
+    output_dir: calls/buy/calendar_spread
+    multi_expirations: true
+    min_volume: 1
+    min_open_interest: 1
