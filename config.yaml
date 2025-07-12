@@ -15,60 +15,60 @@ strategies:
     option_type: calls
     side: buy
     output_dir: calls/buy/leaps
-    min_volume: 1
-    min_open_interest: 1
+    min_volume: 0
+    min_open_interest: 0
   covered_calls:
-    min_dte: 21
-    max_dte: 45
+    min_dte: 0
+    max_dte: 90
     option_type: calls
     side: sell
     output_dir: calls/sell/covered_calls
-    min_volume: 1
-    min_open_interest: 1
+    min_volume: 0
+    min_open_interest: 0
   secured_puts:
-    min_dte: 21
-    max_dte: 45
+    min_dte: 0
+    max_dte: 90
     option_type: puts
     side: sell
     output_dir: puts/sell/secured_puts
-    min_volume: 1
-    min_open_interest: 1
+    min_volume: 0
+    min_open_interest: 0
   iron_condors:
-    min_dte: 21
-    max_dte: 45
+    min_dte: 0
+    max_dte: 90
     option_type: calls and puts
     side: sell
     output_dir: calls/sell/iron_condor
     strike_spread: 15.0
-    min_volume: 1
-    min_open_interest: 1
+    min_volume: 0
+    min_open_interest: 0
   straddles:
-    min_dte: 21
-    max_dte: 45
+    min_dte: 0
+    max_dte: 90
     option_type: calls and puts
     side: buy
     output_dir: calls/buy/straddle
     same_strike: true
-    min_volume: 1
-    min_open_interest: 1
+    min_volume: 0
+    min_open_interest: 0
   strangles:
-    min_dte: 21
-    max_dte: 45
+    min_dte: 0
+    max_dte: 90
     option_type: calls and puts
     side: buy
     output_dir: calls/buy/strangle
     strike_spread: 15.0
-    min_volume: 1
-    min_open_interest: 1
+    min_volume: 0
+    min_open_interest: 0
   credit_spreads:
-    min_dte: 21
-    max_dte: 45
+    min_dte: 0
+    max_dte: 90
     option_type: calls
     side: sell
     output_dir: calls/sell/credit_spread
-    strike_spread: 5.0
-    min_volume: 1
-    min_open_interest: 1
+    strike_spread: 10.0
+    min_volume: 0
+    min_open_interest: 0
   calendar_spreads:
     min_dte: 30
     max_dte: 365
@@ -76,5 +76,5 @@ strategies:
     side: buy
     output_dir: calls/buy/calendar_spread
     multi_expirations: true
-    min_volume: 1
-    min_open_interest: 1
+    min_volume: 0
+    min_open_interest: 0

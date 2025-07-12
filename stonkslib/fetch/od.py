@@ -34,14 +34,14 @@ except FileNotFoundError:
             "log_dir": "log"
         },
         "strategies": {
-            "leaps": {"output_dir": "calls/buy/leaps", "min_dte": 270, "max_dte": 9999, "option_type": "calls", "min_volume": 1, "min_open_interest": 1},
-            "covered_calls": {"output_dir": "calls/sell/covered_calls", "min_dte": 0, "max_dte": 90, "option_type": "calls", "min_volume": 1, "min_open_interest": 1},
-            "secured_puts": {"output_dir": "puts/sell/secured_puts", "min_dte": 0, "max_dte": 90, "option_type": "puts", "min_volume": 1, "min_open_interest": 1},
-            "iron_condors": {"output_dir": "calls/sell/iron_condor", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 1, "min_open_interest": 1},
-            "straddles": {"output_dir": "calls/buy/straddle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "same_strike": True, "min_volume": 1, "min_open_interest": 1},
-            "strangles": {"output_dir": "calls/buy/strangle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 1, "min_open_interest": 1},
-            "credit_spreads": {"output_dir": "calls/sell/credit_spread", "min_dte": 0, "max_dte": 90, "option_type": "calls", "strike_spread": 5.0, "min_volume": 1, "min_open_interest": 1},
-            "calendar_spreads": {"output_dir": "calls/buy/calendar_spread", "min_dte": 30, "max_dte": 365, "option_type": "calls", "multi_expirations": True, "min_volume": 1, "min_open_interest": 1}
+            "leaps": {"output_dir": "calls/buy/leaps", "min_dte": 270, "max_dte": 9999, "option_type": "calls", "min_volume": 0, "min_open_interest": 0},
+            "covered_calls": {"output_dir": "calls/sell/covered_calls", "min_dte": 0, "max_dte": 90, "option_type": "calls", "min_volume": 0, "min_open_interest": 0},
+            "secured_puts": {"output_dir": "puts/sell/secured_puts", "min_dte": 0, "max_dte": 90, "option_type": "puts", "min_volume": 0, "min_open_interest": 0},
+            "iron_condors": {"output_dir": "calls/sell/iron_condor", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 0, "min_open_interest": 0},
+            "straddles": {"output_dir": "calls/buy/straddle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "same_strike": True, "min_volume": 0, "min_open_interest": 0},
+            "strangles": {"output_dir": "calls/buy/strangle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 0, "min_open_interest": 0},
+            "credit_spreads": {"output_dir": "calls/sell/credit_spread", "min_dte": 0, "max_dte": 90, "option_type": "calls", "strike_spread": 10.0, "min_volume": 0, "min_open_interest": 0},
+            "calendar_spreads": {"output_dir": "calls/buy/calendar_spread", "min_dte": 30, "max_dte": 365, "option_type": "calls", "multi_expirations": True, "min_volume": 0, "min_open_interest": 0}
         }
     }
 except Exception as e:
@@ -53,14 +53,14 @@ except Exception as e:
             "log_dir": "log"
         },
         "strategies": {
-            "leaps": {"output_dir": "calls/buy/leaps", "min_dte": 270, "max_dte": 9999, "option_type": "calls", "min_volume": 1, "min_open_interest": 1},
-            "covered_calls": {"output_dir": "calls/sell/covered_calls", "min_dte": 0, "max_dte": 90, "option_type": "calls", "min_volume": 1, "min_open_interest": 1},
-            "secured_puts": {"output_dir": "puts/sell/secured_puts", "min_dte": 0, "max_dte": 90, "option_type": "puts", "min_volume": 1, "min_open_interest": 1},
-            "iron_condors": {"output_dir": "calls/sell/iron_condor", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 1, "min_open_interest": 1},
-            "straddles": {"output_dir": "calls/buy/straddle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "same_strike": True, "min_volume": 1, "min_open_interest": 1},
-            "strangles": {"output_dir": "calls/buy/strangle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 1, "min_open_interest": 1},
-            "credit_spreads": {"output_dir": "calls/sell/credit_spread", "min_dte": 0, "max_dte": 90, "option_type": "calls", "strike_spread": 5.0, "min_volume": 1, "min_open_interest": 1},
-            "calendar_spreads": {"output_dir": "calls/buy/calendar_spread", "min_dte": 30, "max_dte": 365, "option_type": "calls", "multi_expirations": True, "min_volume": 1, "min_open_interest": 1}
+            "leaps": {"output_dir": "calls/buy/leaps", "min_dte": 270, "max_dte": 9999, "option_type": "calls", "min_volume": 0, "min_open_interest": 0},
+            "covered_calls": {"output_dir": "calls/sell/covered_calls", "min_dte": 0, "max_dte": 90, "option_type": "calls", "min_volume": 0, "min_open_interest": 0},
+            "secured_puts": {"output_dir": "puts/sell/secured_puts", "min_dte": 0, "max_dte": 90, "option_type": "puts", "min_volume": 0, "min_open_interest": 0},
+            "iron_condors": {"output_dir": "calls/sell/iron_condor", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 0, "min_open_interest": 0},
+            "straddles": {"output_dir": "calls/buy/straddle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "same_strike": True, "min_volume": 0, "min_open_interest": 0},
+            "strangles": {"output_dir": "calls/buy/strangle", "min_dte": 0, "max_dte": 90, "option_type": "calls and puts", "strike_spread": 15.0, "min_volume": 0, "min_open_interest": 0},
+            "credit_spreads": {"output_dir": "calls/sell/credit_spread", "min_dte": 0, "max_dte": 90, "option_type": "calls", "strike_spread": 10.0, "min_volume": 0, "min_open_interest": 0},
+            "calendar_spreads": {"output_dir": "calls/buy/calendar_spread", "min_dte": 30, "max_dte": 365, "option_type": "calls", "multi_expirations": True, "min_volume": 0, "min_open_interest": 0}
         }
     }
 
@@ -76,12 +76,9 @@ def preprocess_options_data(df):
         return df
     df["expirationDate"] = pd.to_datetime(df["expirationDate"]).dt.strftime("%Y-%m-%d")
     columns = ["expirationDate", "lastPrice", "strike", "daysToExpiration", "optionType", "bid", "ask", "volume", "openInterest", "impliedVolatility", "inTheMoney"]
-    df = df[[col for col in columns if col in df.columns]]
-    # Validate lastPrice within bid/ask
-    df = df[(df["bid"] <= df["lastPrice"]) & (df["lastPrice"] <= df["ask"])]
-    return df
+    return df[[col for col in columns if col in df.columns]]
 
-def fetch_option_chain(ticker, min_days_out, max_days_out, option_type, multi_expirations=False, same_strike=False, strike_spread=None, min_volume=1, min_open_interest=1):
+def fetch_option_chain(ticker, min_days_out, max_days_out, option_type, multi_expirations=False, same_strike=False, strike_spread=None, min_volume=0, min_open_interest=0):
     """Fetch options chain data with strategy-specific filtering."""
     try:
         ticker_obj = yf.Ticker(ticker)
@@ -102,6 +99,8 @@ def fetch_option_chain(ticker, min_days_out, max_days_out, option_type, multi_ex
                 opt = ticker_obj.option_chain(exp)
                 contracts = pd.concat([opt.calls, opt.puts], ignore_index=True) if option_type == "calls and puts" else (opt.calls if option_type == "calls" else opt.puts)
                 if not contracts.empty:
+                    # Log raw data for debugging
+                    logger.debug(f"[d] Raw data for {ticker}, expiration {exp}: {len(contracts)} rows")
                     contracts["expirationDate"] = exp_date
                     contracts["ticker"] = ticker
                     contracts["daysToExpiration"] = dte
@@ -117,45 +116,26 @@ def fetch_option_chain(ticker, min_days_out, max_days_out, option_type, multi_ex
                                 puts[puts["strike"] == atm_strike]
                             ], ignore_index=True)
                             contracts["optionType"] = contracts["contractSymbol"].str[-9:].str[0].map({'C': 'calls', 'P': 'puts'})
+                        else:
+                            # Fallback: Use nearest call and put strikes
+                            call_strike = calls["strike"].iloc[(calls["strike"] - stock_price).abs().argsort()[:1]].values[0] if not calls.empty else stock_price
+                            put_strike = puts["strike"].iloc[(puts["strike"] - stock_price).abs().argsort()[:1]].values[0] if not puts.empty else stock_price
+                            contracts = pd.concat([
+                                calls[calls["strike"] == call_strike],
+                                puts[puts["strike"] == put_strike]
+                            ], ignore_index=True)
+                            contracts["optionType"] = contracts["contractSymbol"].str[-9:].str[0].map({'C': 'calls', 'P': 'puts'})
+                            logger.warning(f"[!] Fallback used for {ticker}, expiration {exp}: no common strikes, using call_strike={call_strike}, put_strike={put_strike}")
                     elif strike_spread:
                         atm_strike = stock_price
                         contracts = contracts[abs(contracts["strike"] - atm_strike) <= strike_spread]
                     elif multi_expirations and option_type == "calls":
+                        # Use most liquid strike or nearest to ATM
                         if not df_list:
                             most_liquid_strike = contracts.loc[contracts["volume"].idxmax(), "strike"] if contracts["volume"].max() > 0 else stock_price
                         contracts = contracts[contracts["strike"] == most_liquid_strike]
-                    # Apply liquidity filter
-                    contracts = contracts[(contracts["bid"] > 0) & (contracts["ask"] > 0) & (contracts["volume"] >= min_volume) & (contracts["openInterest"] >= min_open_interest)]
-                    if contracts.empty and not df_list:
-                        # Fallback: Relax volume and openInterest
-                        contracts = pd.concat([opt.calls, opt.puts], ignore_index=True) if option_type == "calls and puts" else (opt.calls if option_type == "calls" else opt.puts)
-                        contracts["expirationDate"] = exp_date
-                        contracts["ticker"] = ticker
-                        contracts["daysToExpiration"] = dte
-                        contracts["optionType"] = "calls" if option_type == "calls" else ("puts" if option_type == "puts" else option_type)
-                        if same_strike and option_type == "calls and puts":
-                            calls = opt.calls
-                            puts = opt.puts
-                            common_strikes = set(calls["strike"]).intersection(set(puts["strike"]))
-                            if common_strikes:
-                                atm_strike = min(common_strikes, key=lambda x: abs(x - stock_price))
-                                contracts = pd.concat([
-                                    calls[calls["strike"] == atm_strike],
-                                    puts[puts["strike"] == atm_strike]
-                                ], ignore_index=True)
-                                contracts["optionType"] = contracts["contractSymbol"].str[-9:].str[0].map({'C': 'calls', 'P': 'puts'})
-                            else:
-                                contracts = pd.DataFrame()
-                        elif strike_spread:
-                            atm_strike = stock_price
-                            contracts = contracts[abs(contracts["strike"] - atm_strike) <= strike_spread]
-                        elif multi_expirations and option_type == "calls":
-                            if not df_list:
-                                most_liquid_strike = contracts.loc[contracts["volume"].idxmax(), "strike"] if contracts["volume"].max() > 0 else stock_price
-                            contracts = contracts[contracts["strike"] == most_liquid_strike]
-                        contracts = contracts[(contracts["bid"] > 0) & (contracts["ask"] > 0)]
-                        if not contracts.empty:
-                            logger.warning(f"[!] Fallback used for {ticker}, expiration {exp}: relaxed volume and openInterest")
+                    # Apply minimal liquidity filter
+                    contracts = contracts[(contracts["bid"] > 0) & (contracts["ask"] > 0)]
                     if not contracts.empty:
                         df_list.append(contracts)
                         logger.info(f"[i] Found {len(contracts)} valid contracts for {ticker}, expiration {exp}")
@@ -197,8 +177,8 @@ def fetch_all_options(output_dir=OPTIONS_RAW_DIR, min_days_out=0, max_days_out=1
             multi_expirations=params.get("multi_expirations", False),
             same_strike=params.get("same_strike", False),
             strike_spread=params.get("strike_spread"),
-            min_volume=params.get("min_volume", 1),
-            min_open_interest=params.get("min_open_interest", 1)
+            min_volume=params.get("min_volume", 0),
+            min_open_interest=params.get("min_open_interest", 0)
         )
         if not df.empty:
             df = preprocess_options_data(df)
