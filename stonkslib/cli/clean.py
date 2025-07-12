@@ -2,8 +2,8 @@ import click
 import yaml
 from pathlib import Path
 from stonkslib.utils.logging import setup_logging
-from stonkslib.utils.clean_td import clean_td
-from stonkslib.utils.clean_od import clean_options_data
+from stonkslib.clean.td import clean_stock_data  # Updated function name
+from stonkslib.clean.od import clean_options_data
 
 # Load configuration
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -59,9 +59,11 @@ def tickers(force, ticker, interval):
     for t in tickers:
         for i in intervals:
             try:
-                df = clean_td(t, i, force=force)
+                df = clean_stock_data(t, i, force=force)  # Updated function name
                 if df is not None:
                     logger.info(f"[✓] Cleaned {t} ({i}) — {len(df)} rows")
+                else:
+                    logger.warning(f"[!] No data to clean for {t} ({i})")
             except Exception as e:
                 logger.error(f"[!] Failed to clean {t} ({i}): {e}")
 
@@ -88,6 +90,8 @@ def options(force, ticker, strategy):
                 df = clean_options_data(t, s, force=force)
                 if df is not None:
                     logger.info(f"[✓] Cleaned options {t} ({s}) — {len(df)} rows")
+                else:
+                    logger.warning(f"[!] No data to clean for options {t} ({s})")
             except Exception as e:
                 logger.error(f"[!] Failed to clean options {t} ({s}): {e}")
 

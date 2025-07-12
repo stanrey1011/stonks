@@ -3,8 +3,8 @@ import os
 import click
 import yaml
 from pathlib import Path
-from stonkslib.fetch.data import fetch_all
-from stonkslib.fetch.options.od import fetch_all_options, load_tickers
+from stonkslib.fetch.td import fetch_all
+from stonkslib.fetch.od import fetch_all_options, load_tickers
 from stonkslib.utils.logging import setup_logging
 
 # Load configuration

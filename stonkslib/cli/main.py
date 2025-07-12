@@ -1,6 +1,6 @@
 # stonkslib/cli/main.py
 import click
-from stonkslib.cli.fetch import fetch  # Correct path
+from stonkslib.cli.fetch import fetch
 from stonkslib.cli.clean import clean
 from stonkslib.cli.analyze import analyze
 from stonkslib.cli.merge import merge
