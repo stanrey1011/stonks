@@ -5,7 +5,7 @@ import pandas as pd
 BASE_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_CLEAN_DIR = BASE_DIR / "data" / "ticker_data" / "clean"
 
-def load_td(tickers: list[str], interval: str, base_dir: Path = DEFAULT_CLEAN_DIR):
+def load_td(tickers: list[str], interval: str, base_dir: Path = DEFAULT_CLEAN_DIR) -> dict[str, pd.DataFrame | None]:
     """
     Load cleaned CSVs into memory for LLMs or analysis.
 
@@ -15,15 +15,15 @@ def load_td(tickers: list[str], interval: str, base_dir: Path = DEFAULT_CLEAN_DI
         base_dir (Path): Base path to cleaned data
 
     Returns:
-        dict: Dictionary of DataFrames keyed by ticker
+        dict: Dictionary of DataFrames keyed by ticker; None if missing/invalid
     """
     data = {}
-    interval_path = base_dir / interval
-
     for ticker in tickers:
-        file_path = interval_path / f"{ticker}.csv"
+        ticker_path = base_dir / ticker  # Fixed: {ticker} first
+        file_path = ticker_path / f"{interval}.csv"  # Now clean/{ticker}/{interval}.csv
         if not file_path.exists():
-            print(f"[!] Missing cleaned file: {ticker} ({interval})")
+            print(f"[!] Missing cleaned file: {ticker} ({interval}) at {file_path}")
+            data[ticker] = None  # Explicit None for graceful handling
             continue
 
         try:
@@ -32,5 +32,6 @@ def load_td(tickers: list[str], interval: str, base_dir: Path = DEFAULT_CLEAN_DI
             data[ticker] = df
         except Exception as e:
             print(f"[!] Failed to load {file_path}: {e}")
+            data[ticker] = None
 
     return data
