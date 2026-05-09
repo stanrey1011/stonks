@@ -20,14 +20,15 @@ def load_td(tickers: list[str], interval: str, base_dir: Path = DEFAULT_CLEAN_DI
     data = {}
     for ticker in tickers:
         ticker_path = base_dir / ticker  # Fixed: {ticker} first
-        file_path = ticker_path / f"{interval}.csv"  # Now clean/{ticker}/{interval}.csv
+        file_path = ticker_path / f"{interval}.parquet"
         if not file_path.exists():
             print(f"[!] Missing cleaned file: {ticker} ({interval}) at {file_path}")
             data[ticker] = None  # Explicit None for graceful handling
             continue
 
         try:
-            df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+            df = pd.read_parquet(file_path)
+            df.columns = df.columns.str.title()
             df = df.sort_index()
             data[ticker] = df
         except Exception as e:

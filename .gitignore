@@ -15,6 +15,10 @@ data/
 log/
 charts/
 *.db
+*.parquet
+
+# Generated
+stonkslib/strategies/optimized/
 
 # OS-specific
 .DS_Store
@@ -34,3 +38,4 @@ dist/
 *.zip
 *.bak
 *.tmp
+.env

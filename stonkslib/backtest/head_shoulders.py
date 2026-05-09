@@ -27,8 +27,8 @@ except Exception as e:
     logger.error(f"[!] Error loading config.yaml: {e}")
     config = {"project": {"ticker_data_dir": "data/ticker_data/raw", "options_data_dir": "data/options_data/raw", "backtest_dir": "data/backtest_results", "log_dir": "log"}}
 
-PATTERN_BASE = PROJECT_ROOT / config["project"]["ticker_data_dir"] / "analysis" / "merged" / "by-patterns"
-PRICE_BASE = PROJECT_ROOT / config["project"]["ticker_data_dir"] / "analysis" / "merged" / "by-indicators"
+PATTERN_BASE = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-patterns"
+PRICE_BASE = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-indicators"
 OPTIONS_BASE = PROJECT_ROOT / config["project"]["options_data_dir"]
 OUTPUT_BASE = PROJECT_ROOT / config["project"]["backtest_dir"] / "patterns" / "head_shoulders"
 
@@ -126,7 +126,7 @@ def backtest_file(filepath, outpath, strat_config, ticker):
     result = {
         "symbol": ticker,
         "strategy": strat_config.get("name", "head_shoulders"),
-        "metrics": {"final_cash": cash, "net_pnl": total_pnl, "trades": len(results_df) // 2}
+        "metrics": {"final_cash": round(float(cash), 2), "net_pnl": round(float(total_pnl), 2), "trades": int(len(results_df) // 2)}
     }
     json_outpath = OUTPUT_BASE / f"{strat_config.get('name', 'head_shoulders')}_{ticker}.json"
     json_outpath.parent.mkdir(parents=True, exist_ok=True)
@@ -143,11 +143,12 @@ def run_all_backtests(df=None, strat_config=None, ticker=None, output_dir=OUTPUT
         backtest_file(df, outpath, strat_config, ticker)
     else:
         intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
-        tickers = [d.name for d in (TICKER_DATA_DIR / "analysis" / "merged" / "by-indicators").iterdir() if d.is_dir()]
+        tickers = [d.name for d in PRICE_BASE.iterdir() if d.is_dir()]
         for ticker in tickers:
             for interval in intervals:
-                input_file = TICKER_DATA_DIR / "analysis" / "merged" / "by-indicators" / ticker / f"{interval}.csv"
-                outdir = output_dir / "indicators" / ticker
+                input_file = PRICE_BASE / ticker / f"{interval}.csv"
+                outdir = output_dir / "head_shoulders" / ticker
+                outdir.mkdir(parents=True, exist_ok=True)
                 outpath = outdir / f"{interval}.csv"
                 if input_file.exists():
                     backtest_file(input_file, outpath, strat_config or {}, ticker)

@@ -91,3 +91,4 @@ websockets==15.0.1
 Werkzeug==3.0.6
 yfinance==0.2.62
 zipp==3.23.0
+discord.py>=2.3.0

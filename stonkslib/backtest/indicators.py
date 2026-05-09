@@ -30,6 +30,7 @@ except Exception as e:
 INPUT_BASE = PROJECT_ROOT / config["project"]["ticker_data_dir"]
 OPTIONS_BASE = PROJECT_ROOT / config["project"]["options_data_dir"]
 OUTPUT_BASE = PROJECT_ROOT / config["project"]["backtest_dir"]
+MERGED_DIR = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-indicators"
 
 # Re-setup logging with correct log_dir
 logger = setup_logging(PROJECT_ROOT / config["project"]["log_dir"], "indicators.log")
@@ -55,7 +56,7 @@ def backtest_file(filepath, outpath, strat_config, ticker):
     max_dte = strat_config.get("max_dte", 9999)
     option_type = strat_config.get("option_type", "calls")
 
-    for i, row in df.iterrows():
+    for idx, (i, row) in enumerate(df.iterrows()):
         if not options_df.empty:
             current_date = pd.to_datetime(i).date()
             options_subset = options_df[
@@ -68,13 +69,14 @@ def backtest_file(filepath, outpath, strat_config, ticker):
         else:
             close = row.get("Close")
 
-        rsi = row.get("rsi_RSI_7")
-        macd = row.get("macd_MACD_12_26_9")
-        ma_swing = row.get("ma_double_MA_Swing")
-        ma_long = row.get("ma_double_MA_Long")
-        ma_short = row.get("ma_triple_MA_Short")
-        ma_medium = row.get("ma_triple_MA_Medium")
-        ma_long3 = row.get("ma_triple_MA_Long")
+        rsi = row.get("RSI_7")
+        macd = row.get("MACD_12_26_9")
+        ma_swing = row.get("MA_Swing")
+        ma_long = row.get("MA_Long")
+        ma_short = row.get("MA_Short")
+        ma_medium = row.get("MA_Medium")
+        ma_long3 = row.get("MA_Long_ma_triple")
+        prev_idx = idx - 1
 
         entry = False
         exit = False
@@ -87,7 +89,6 @@ def backtest_file(filepath, outpath, strat_config, ticker):
                 reason = f"RSI<{rsi_low} & MACD>0"
 
         if pos == 0 and ma_swing is not None and ma_long is not None:
-            prev_idx = df.index.get_loc(i) - 1
             if prev_idx >= 0:
                 prev_row = df.iloc[prev_idx]
                 prev_swing = prev_row.get("ma_double_MA_Swing")
@@ -98,7 +99,6 @@ def backtest_file(filepath, outpath, strat_config, ticker):
                         reason = "Double MA Bullish Crossover"
 
         if pos == 0 and ma_short is not None and ma_medium is not None and ma_long3 is not None:
-            prev_idx = df.index.get_loc(i) - 1
             if prev_idx >= 0:
                 prev_row = df.iloc[prev_idx]
                 prev_short = prev_row.get("ma_triple_MA_Short")
@@ -164,7 +164,7 @@ def backtest_file(filepath, outpath, strat_config, ticker):
     result = {
         "symbol": ticker,
         "strategy": strat_config.get("name", "indicators"),
-        "metrics": {"final_cash": cash, "net_pnl": total_pnl, "trades": len(results_df) // 2}
+        "metrics": {"final_cash": round(float(cash), 2), "net_pnl": round(float(total_pnl), 2), "trades": int(len(results_df) // 2)}
     }
     json_outpath = OUTPUT_BASE / f"{strat_config.get('name', 'indicators')}_{ticker}.json"
     json_outpath.parent.mkdir(parents=True, exist_ok=True)
@@ -181,11 +181,12 @@ def run_all_backtests(df=None, strat_config=None, ticker=None, output_dir=OUTPUT
         backtest_file(df, outpath, strat_config, ticker)
     else:
         intervals = ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]
-        tickers = [d.name for d in (TICKER_DATA_DIR / "analysis" / "merged" / "by-indicators").iterdir() if d.is_dir()]
+        tickers = [d.name for d in MERGED_DIR.iterdir() if d.is_dir()]
         for ticker in tickers:
             for interval in intervals:
-                input_file = TICKER_DATA_DIR / "analysis" / "merged" / "by-indicators" / ticker / f"{interval}.csv"
+                input_file = MERGED_DIR / ticker / f"{interval}.csv"
                 outdir = output_dir / "indicators" / ticker
+                outdir.mkdir(parents=True, exist_ok=True)
                 outpath = outdir / f"{interval}.csv"
                 if input_file.exists():
                     backtest_file(input_file, outpath, strat_config or {}, ticker)

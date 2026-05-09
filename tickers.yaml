@@ -1,13 +1,12 @@
-stocks:
-  - AAPL
-  - MSFT
-  - TSLA
-  - NVDA
-
 crypto:
-  - BTC-USD
-  - ETH-USD
-
+- BTC-USD
+- ETH-USD
 etfs:
-  - SPY
-  - QQQ
+- SPY
+- QQQ
+stocks:
+- AAPL
+- TSLA
+- NVDA
+- MSFT
+- BBAI

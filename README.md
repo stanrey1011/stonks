@@ -1,208 +1,247 @@
-# Stonks Quant Dashboard
+# Stonks
 
-An interactive, multi-layered dashboard for visualizing and exploring price action, indicators, and pattern signals for stocks, crypto, and ETFs.  
-Supports overlays for Bollinger Bands, moving averages, and more, with a simple Python-based CLI for fetching, cleaning, and analyzing your market data.
+A local-first quantitative trading toolkit for stocks, ETFs, and crypto. Fetches and cleans OHLCV data from Yahoo Finance, runs technical indicator analysis, backtests YAML-defined strategies, optimizes parameters via local LLM (Ollama), and delivers daily trade alerts to Discord — all from a single CLI.
 
 ---
 
 ## Features
 
-- Candlestick charting for any asset and interval (minute, hourly, daily, weekly)
-- Overlay indicators (Bollinger Bands, Double/Triple MAs, etc.) with checkboxes
-- Adjustable candle scaling for better pattern visibility
-- Debug/data panel for troubleshooting
-- Clean, extensible Python and Streamlit codebase
-- Modular CLI for data fetching, cleaning, and signal analysis
+- **Data pipeline** — fetch, clean, and analyze OHLCV data for any ticker/interval
+- **Technical indicators** — RSI, MACD, Bollinger Bands, OBV, SMA/EMA double & triple, Fibonacci
+- **Chart patterns** — Head & Shoulders, Triangles, Double tops/bottoms, Wedges
+- **YAML strategies** — define indicator combos, thresholds, and risk params in plain text
+- **Backtesting** — realistic fills at next bar open with configurable slippage
+- **LLM optimization** — Ollama-driven parameter tuning across strategies and tickers
+- **Daily alerts** — cron-scheduled signal scan posts BUY/SELL alerts to Discord
+- **Discord bot** — manage watchlist, run scans, and kick off optimization from chat
+- **Streamlit dashboard** — interactive candlestick charts with indicator overlays
 
 ---
 
 ## Quick Start
 
-1. **Clone or download this repository**
-    ```sh
-    git clone <your-repo-url> stonks
-    cd stonks
-    ```
-    Or just unzip/copy the folder to your machine.
+```sh
+git clone https://github.com/stanrey1011/stonks
+cd stonks
+python3.13 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-2. **Edit `tickers.yaml`**  
-   Add or remove the tickers, crypto pairs, and ETFs you want to analyze.  
-   The format looks like:
-    ```yaml
-    stocks:
-      - AAPL
-      - MSFT
-      - TSLA
-      - NVDA
-
-    crypto:
-      - BTC-USD
-      - ETH-USD
-
-    etfs:
-      - SPY
-      - QQQ
-    ```
-   *(All tickers must match Yahoo Finance or your data provider’s conventions.)*
-
-3. **Create and activate a virtual environment**
-    ```sh
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-    *(On Windows: `venv\Scripts\activate`)*
-
-4. **Install required Python packages**
-    ```sh
-    pip install -r requirements.txt
-    ```
-
-5. **(Once per new data set) Fetch, clean, and analyze data**
-    ```sh
-    stonks fetch
-    stonks clean
-    stonks analyze
-    ```
-
-6. **Run the dashboard**
-    ```sh
-    streamlit run stonkslib/dash/dashboard.py
-    ```
-    Then open the provided URL (usually [http://localhost:8501](http://localhost:8501)) in your browser.
+> **Note:** Requires Python 3.13. Python 3.14 is not yet compatible with numpy.
 
 ---
 
-## Using the Dashboard
+## Setup
 
-- Select your ticker and interval in the sidebar
-- Toggle indicator overlays (Bollinger Bands, Moving Averages, etc.)
-- Adjust vertical scaling to zoom in/out on candle patterns
-- Open the debug expander to view raw data for troubleshooting or verification
+### 1. Configure tickers
+
+Edit `tickers.yaml` to set your watchlist:
+
+```yaml
+stocks:
+  - AAPL
+  - MSFT
+crypto:
+  - BTC-USD
+  - ETH-USD
+etfs:
+  - SPY
+  - QQQ
+```
+
+Or manage it from the CLI:
+```sh
+stonks tickers add AMZN
+stonks tickers add SOL-USD --category crypto
+stonks tickers remove MSFT
+stonks tickers list
+```
+
+### 2. Configure Discord (optional)
+
+Create a `.env` file in the project root:
+
+```sh
+STONKS_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+DISCORD_BOT_TOKEN=your.bot.token.here
+```
 
 ---
 
-## Troubleshooting
+## CLI Reference
 
-- **Missing data error?**  
-  Make sure you’ve run `stonks fetch`, `stonks clean`, and `stonks analyze`, and check your `data/` directories for the expected CSVs.
+### Data Pipeline
 
-- **Missing package error?**  
-  Double-check you’re in your virtual environment and have run `pip install -r requirements.txt`.
+```sh
+stonks fetch --all-tickers --interval 1d      # fetch raw OHLCV from Yahoo Finance
+stonks clean --all-tickers --interval 1d      # clean and standardize
+stonks analyze --all-tickers --interval 1d    # run indicators and pattern detection
+stonks merge --all-tickers --interval 1d      # combine into single CSV per ticker
+```
 
-- **Charts don’t show overlays?**  
-  Confirm that indicator files exist for the selected ticker/interval in `data/analysis/signals/`.
+### Backtesting
+
+```sh
+stonks backtest --strategy rsi.yaml --ticker AAPL --interval 1d
+stonks backtest --all-strategies --all-tickers --interval 1d
+```
+
+Strategies live in `stonkslib/strategies/`. Each YAML defines enabled indicators, thresholds, and risk params (position size, stop loss, slippage).
+
+### LLM Optimization
+
+Uses a local Ollama model to iteratively improve strategy parameters based on backtest results.
+
+```sh
+stonks optimize --strategy rsi.yaml --ticker AAPL --iterations 5
+stonks optimize --all-strategies --all-tickers --iterations 3
+stonks optimize --strategy rsi.yaml --all-tickers --model qwen2.5:32b
+```
+
+Optimized YAMLs are saved to `stonkslib/strategies/optimized/`.
+
+### Alerts
+
+```sh
+stonks alert --strategy rsi.yaml --all-tickers
+stonks alert --all-strategies --all-tickers --use-optimized
+stonks alert --all-strategies --all-tickers --webhook-url $STONKS_DISCORD_WEBHOOK
+```
+
+Only fires to Discord when signals exist.
+
+### Watchlist
+
+```sh
+stonks tickers list
+stonks tickers add AMD
+stonks tickers add SOL-USD --category crypto
+stonks tickers remove TSLA
+stonks tickers announce           # post full watchlist to Discord
+```
+
+Adding or removing a ticker automatically notifies Discord.
+
+### Discord Bot
+
+```sh
+stonks bot          # start the bot (or use systemd service)
+```
+
+Bot commands (in Discord):
+```
+!help
+!tickers
+!tickers add AMZN
+!tickers add SOL-USD crypto
+!tickers remove TSLA
+!alert
+!alert AAPL
+!optimize AAPL
+!optimize
+```
+
+### Dashboard
+
+```sh
+streamlit run stonkslib/dash/dashboard.py
+```
 
 ---
 
-## Development
+## Automated Daily Alerts
 
-- All indicator/pattern scripts are modular and easy to extend (see `stonkslib/indicators/`, `stonkslib/patterns/`)
-- Strategies are YAML-based (see `stonkslib/strategies/`)
-- CLI commands are managed in `stonkslib/cli/` (modularized from old monolithic `stonks_cli.py`)
+Runs via a systemd user timer — no cron needed.
+
+```sh
+systemctl --user enable stonks-alert.timer
+systemctl --user start stonks-alert.timer
+```
+
+Fires every weekday at 4:30pm ET (20:30 UTC). Fetches fresh data, scans all strategies, posts to Discord if signals fire.
+
+```sh
+systemctl --user list-timers                  # check next scheduled run
+systemctl --user start stonks-alert.service   # trigger manually anytime
+```
 
 ---
 
-## License
+## Running the Bot as a Service
 
-MIT License (see LICENSE file)
+The bot runs as a systemd user service so it stays alive without a terminal:
+
+```sh
+systemctl --user enable stonks-bot
+systemctl --user start stonks-bot
+systemctl --user status stonks-bot
+journalctl --user -u stonks-bot -f    # live logs
+```
 
 ---
 
-**Questions or improvements?**  
-Open an issue or submit a pull request!
+## Strategies
+
+Strategies are defined in `stonkslib/strategies/*.yaml`:
+
+```yaml
+name: RSI Only
+indicators:
+  rsi:
+    enabled: true
+    params:
+      period: 14
+      overbought: 70
+      oversold: 30
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2
+  stop_loss_pct: 0.1
+  slippage: 0.0005
+```
+
+Available indicators: `rsi`, `macd`, `bollinger`, `ma_double`
+
+---
+
+## yfinance Intervals & Lookback Limits
+
+| Interval | Stocks/ETFs         | Crypto              |
+|----------|---------------------|---------------------|
+| `1m`     | 7 days              | 7–60 days           |
+| `5m`     | 60 days             | 60 days             |
+| `15m`    | 60 days             | 60 days             |
+| `1h`     | ~2 years            | ~2 years            |
+| `1d`     | Full history        | Full history        |
+| `1wk`    | Full history        | Full history        |
 
 ---
 
 ## Folder Structure
 
 ```
-
-stonks/ # 🧠 Root project folder (Git repo, README, setup files)
-│
-├── stonkslib/ # 🔧 Core Python package (all main logic)
-│ ├── init.py
-│ ├── alerts/ # 🔔 Trade alert/notification logic
-│ ├── analysis/ # 📊 Signal generation/analysis scripts
-│ ├── backtest/ # 🔙 Backtesting engines & logic
-│ ├── cli/ # 🖥️ Modular CLI commands (fetch, clean, analyze, merge, backtest)
-│ ├── dash/ # 📉 Dash/Streamlit/Plotly dashboard UIs
-│ ├── execution/ # ⚙️ (Optional) Trade execution for brokers/APIs
-│ ├── fetch/ # 📡 Data fetching modules
-│ ├── import/ # 🛂 DB import scripts (e.g. DuckDB, SQLite)
-│ ├── indicators/ # 📈 Technical indicators (RSI, MACD, BB, etc.)
-│ ├── llm_integration/ # 🤖 LLM helpers/integration (optional)
-│ ├── merge/ # 🧬 CSV merging/combine logic
-│ ├── patterns/ # 🧠 Chart pattern detectors (H&S, triangles, etc.)
-│ ├── plots/ # 🖼️ Plotting/dashboard scripts (main Streamlit app)
-│ ├── strategies/ # 🧾 YAML strategy configs (user-editable)
-│ ├── trading_logic/ # 🔀 Rules-based or template strategies
-│ ├── utils/ # 🧰 Helper modules (clean_td, load_td, etc.)
-│ └── stonks_cli.py # 🖥️ Main CLI entry (now modularized in cli/)
-│
-├── data/ # 📦 Project data (usually in .gitignore)
-│ ├── ticker_data/
-│ │ ├── raw/ # Raw CSVs fetched from provider (per interval/ticker)
-│ │ └── clean/ # Cleaned/standardized OHLCV CSVs (per interval/ticker)
-│ ├── analysis/ # Results of indicator/pattern analysis, backtests, etc.
-│ │ ├── signals/ # Per-ticker/interval indicator signals (csvs)
-│ │ ├── merged/ # Merged indicator/pattern signals for LLM/modeling
-│ │ └── backtests/ # Backtest results (per strategy/pattern)
-│ └── charts/ # (Optional) Example chart images, visualizations, pattern samples
-│
-├── dev/ # 🧪 Dev scripts, migration helpers, experiments
-│
-├── tickers.yaml # 📋 Your config file — list of tickers/crypto/etfs to fetch
-├── requirements.txt # 📦 List of Python package dependencies
-├── README.md # 📘 This file!
-├── .gitignore # 🔒 Ignores pycache, venv/, data folders
-├── pyproject.toml # 🛠️ Python project/build tool config
-├── setup.py # 🛠️ Legacy setup (if needed)
-└── venv/ # 🐍 Local Python virtualenv (never committed)
-
+stonks/
+├── stonkslib/
+│   ├── alerts/         # Signal detection logic
+│   ├── backtest/       # Backtesting engines
+│   ├── bot/            # Discord bot
+│   ├── cli/            # CLI commands
+│   ├── dash/           # Streamlit dashboard
+│   ├── indicators/     # RSI, MACD, Bollinger, MA, OBV, Fibonacci
+│   ├── llm/            # Ollama optimization loop
+│   ├── patterns/       # Chart pattern detectors
+│   ├── strategies/     # YAML strategy configs
+│   └── utils/          # Shared helpers
+├── data/               # Fetched/cleaned data (gitignored)
+├── scripts/            # daily_alert.sh cron script
+├── tickers.yaml        # Your watchlist
+├── .env                # Discord webhook + bot token (gitignored)
+└── requirements.txt
 ```
 
-### yfinance Intervals & Lookback Limits
+---
 
-```
+## License
 
-| Interval | Description     | Stocks/ETFs         | Crypto (BTC/ETH-USD) |
-|----------|-----------------|---------------------|----------------------|
-| `1m`     | 1-minute data   | 7 days              | 7–60 days (often 60) |
-| `2m`     | 2-minute data   | 60 days             | 60 days              |
-| `5m`     | 5-minute data   | 60 days             | 60 days              |
-| `15m`    | 15-minute data  | 60 days             | 60 days              |
-| `1h`     | Hourly data     | 730 days (~2 years) | 730 days             |
-| `1d`     | Daily OHLC      | Full history        | Full history         |
-| `1wk`    | Weekly OHLC     | Full history        | Full history         |
-| `1mo`    | Monthly OHLC    | Full history        | Full history         |
-
-```
-
-## Ziping the project
-
-```sh
-zip -r stonks_clean.zip stonks \
-  -x "stonks/venv/*" \
-  -x "stonks/__pycache__/*" \
-  -x "stonks/*.egg-info/*" \
-  -x "stonks/**/*.pyc" \
-  -x "stonks/.git/*" \
-  -x "stonks/dev/*" \
-  -x "stonks/data/*"
-  -x "stonks/data/*"
-
-```
-
-## Other Notes
-
-```
-
-tree -I "venv|__pycache__|*.egg-info" -L 2
-
-1. update ticker.yaml
-2. stonks fetch - retrieves ticker data from yahoo finance (data/ticker_data/raw/{interval}/{ticker}.csv)
-3. stonks clean - clean and standardize raw ticker data (data/ticker_data/clean/{interval}/{ticker}.csv)
-4. stonks analyze - runs clean ticker through indicators and pattern detection (data/analysis/signals/{ticker}/{interval}/{source}.csv)
-5. stonks merge - combines all indicators and patterns into a single csv (data/analysis/signals/{ticker}/{interval}/{source}.csv)
-
-```
+MIT

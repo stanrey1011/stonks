@@ -59,7 +59,7 @@ logger = setup_logging(LOG_DIR, "backtest.log")
     help="Which backtests to run: indicators, triangles, head_shoulders, wedges, or all",
 )
 @click.option(
-    "--config",
+    "--config-file",
     type=click.Path(exists=True, dir_okay=False),
     default=None,
     help="Path to strategy YAML config file (default: use config.yaml strategies)",
@@ -70,10 +70,10 @@ logger = setup_logging(LOG_DIR, "backtest.log")
     default=None,
     help="Strategy to backtest (required for options, default: all from config.yaml for stocks)",
 )
-@click.option("--ticker", type=str, default="AAPL", help="Ticker to backtest (default: AAPL)")
-def backtest(type, target, config, strategy, ticker):
+@click.option("--ticker", type=str, default=None, help="Ticker to backtest (default: all)")
+def backtest(type, target, config_file, strategy, ticker):
     """Run backtests on stock or options data."""
-    strategy_config = load_strategy_config(config) if config else None
+    strategy_config = load_strategy_config(config_file) if config_file else None
     if type == "options" and not strategy:
         logger.error("[!] --strategy must be specified for options backtests")
         return
@@ -83,7 +83,7 @@ def backtest(type, target, config, strategy, ticker):
 
     ran = False
     for strat in strategies_to_run:
-        strat_config = config.get("strategies", {}).get(strat, strategy_config)
+        strat_config = config.get("strategies", {}).get(strat) or strategy_config or {}
         if not strat_config:
             logger.error(f"[!] No config for strategy {strat}, skipping...")
             continue
