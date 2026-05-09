@@ -117,15 +117,22 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
         sw = float(ma_swing_series.iloc[idx]) if ma_swing_series is not None and idx < len(ma_swing_series) else None
         ml = float(ma_long_series.iloc[idx])  if ma_long_series  is not None and idx < len(ma_long_series)  else None
 
+        bb_and_rsi = bl is not None and rsi_series is not None
+
         # --- Generate entry signal (fills at next bar's open) ---
         if pos == 0 and pending is None:
-            if r is not None and m is not None and r < rsi_oversold and m > 0:
-                pending, pending_reason = "buy", f"RSI<{rsi_oversold} & MACD>0"
-            elif r is not None and m is None and r < rsi_oversold:
-                pending, pending_reason = "buy", f"RSI<{rsi_oversold}"
-            elif bl is not None and not pd.isna(bl) and close < bl:
-                pending, pending_reason = "buy", "Below lower Bollinger Band"
-            elif sw is not None and ml is not None and idx > 0:
+            if bb_and_rsi:
+                if r < rsi_oversold and not pd.isna(bl) and close < bl:
+                    pending, pending_reason = "buy", f"RSI<{rsi_oversold} & below lower BB"
+            else:
+                if r is not None and m is not None and r < rsi_oversold and m > 0:
+                    pending, pending_reason = "buy", f"RSI<{rsi_oversold} & MACD>0"
+                elif r is not None and m is None and r < rsi_oversold:
+                    pending, pending_reason = "buy", f"RSI<{rsi_oversold}"
+                elif bl is not None and not pd.isna(bl) and close < bl:
+                    pending, pending_reason = "buy", "Below lower Bollinger Band"
+
+            if pending is None and sw is not None and ml is not None and idx > 0:
                 prev_sw = float(ma_swing_series.iloc[idx - 1])
                 prev_ml = float(ma_long_series.iloc[idx - 1])
                 if prev_sw <= prev_ml and sw > ml:

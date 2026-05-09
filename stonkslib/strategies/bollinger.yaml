@@ -1,5 +1,5 @@
-name: "Bollinger Band Breakout"
-description: "Buy on lower band breakout, sell on upper"
+name: "Bollinger + RSI"
+description: "Buy when price below lower band AND RSI oversold. Sell when above upper band OR RSI overbought."
 indicators:
   bollinger:
     enabled: true
@@ -7,7 +7,11 @@ indicators:
       window: 20
       num_std_dev: 2
   rsi:
-    enabled: false
+    enabled: true
+    params:
+      period: 14
+      overbought: 65
+      oversold: 35
   macd:
     enabled: false
   ma_double:
@@ -22,3 +26,5 @@ patterns:
 risk:
   start_cash: 10000
   risk_per_trade: 0.2
+  stop_loss_pct: 0.08
+  slippage: 0.0005

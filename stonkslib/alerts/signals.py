@@ -82,40 +82,46 @@ def check_signals(ticker, interval, strategy):
     ml = float(ma_long_series.iloc[last_idx])  if ma_long_series  is not None else None
 
     signals = []
+    sig = lambda t, reason: {"type": t, "reason": reason, "ticker": ticker,
+                              "interval": interval, "close": round(float(close), 2), "date": str(date)}
+
+    bb_and_rsi = bl is not None and r is not None  # both enabled — use AND logic
 
     # --- Entry signals ---
-    if r is not None and m is not None and r < rsi_oversold and m > 0:
-        signals.append({"type": "BUY", "reason": f"RSI={r:.1f} < {rsi_oversold} & MACD>0",
-                        "ticker": ticker, "interval": interval, "close": round(float(close), 2), "date": str(date)})
-    elif r is not None and m is None and r < rsi_oversold:
-        signals.append({"type": "BUY", "reason": f"RSI={r:.1f} < {rsi_oversold}",
-                        "ticker": ticker, "interval": interval, "close": round(float(close), 2), "date": str(date)})
+    if bb_and_rsi:
+        if r < rsi_oversold and not pd.isna(bl) and close < bl:
+            signals.append(sig("BUY", f"RSI={r:.1f} < {rsi_oversold} & below lower BB ${bl:.2f}"))
+    else:
+        if r is not None and m is not None and r < rsi_oversold and m > 0:
+            signals.append(sig("BUY", f"RSI={r:.1f} < {rsi_oversold} & MACD>0"))
+        elif r is not None and m is None and r < rsi_oversold:
+            signals.append(sig("BUY", f"RSI={r:.1f} < {rsi_oversold}"))
 
-    if bl is not None and not pd.isna(bl) and close < bl:
-        signals.append({"type": "BUY", "reason": f"Price ${close:.2f} below lower Bollinger Band ${bl:.2f}",
-                        "ticker": ticker, "interval": interval, "close": round(float(close), 2), "date": str(date)})
+        if bl is not None and not pd.isna(bl) and close < bl:
+            signals.append(sig("BUY", f"Price ${close:.2f} below lower BB ${bl:.2f}"))
 
     if sw is not None and ml is not None:
         prev_sw = float(ma_swing_series.iloc[last_idx - 1])
         prev_ml = float(ma_long_series.iloc[last_idx - 1])
         if prev_sw <= prev_ml and sw > ml:
-            signals.append({"type": "BUY", "reason": "MA Bullish Crossover",
-                            "ticker": ticker, "interval": interval, "close": round(float(close), 2), "date": str(date)})
+            signals.append(sig("BUY", "MA Bullish Crossover"))
 
     # --- Exit signals ---
-    if r is not None and r > rsi_overbought:
-        signals.append({"type": "SELL", "reason": f"RSI={r:.1f} > {rsi_overbought}",
-                        "ticker": ticker, "interval": interval, "close": round(float(close), 2), "date": str(date)})
-
-    if bu is not None and not pd.isna(bu) and close > bu:
-        signals.append({"type": "SELL", "reason": f"Price ${close:.2f} above upper Bollinger Band ${bu:.2f}",
-                        "ticker": ticker, "interval": interval, "close": round(float(close), 2), "date": str(date)})
+    if bb_and_rsi:
+        if r > rsi_overbought:
+            signals.append(sig("SELL", f"RSI={r:.1f} > {rsi_overbought}"))
+        if bu is not None and not pd.isna(bu) and close > bu:
+            signals.append(sig("SELL", f"Price ${close:.2f} above upper BB ${bu:.2f}"))
+    else:
+        if r is not None and r > rsi_overbought:
+            signals.append(sig("SELL", f"RSI={r:.1f} > {rsi_overbought}"))
+        if bu is not None and not pd.isna(bu) and close > bu:
+            signals.append(sig("SELL", f"Price ${close:.2f} above upper BB ${bu:.2f}"))
 
     if sw is not None and ml is not None:
         prev_sw = float(ma_swing_series.iloc[last_idx - 1])
         prev_ml = float(ma_long_series.iloc[last_idx - 1])
         if prev_sw >= prev_ml and sw < ml:
-            signals.append({"type": "SELL", "reason": "MA Bearish Crossover",
-                            "ticker": ticker, "interval": interval, "close": round(float(close), 2), "date": str(date)})
+            signals.append(sig("SELL", "MA Bearish Crossover"))
 
     return signals if signals else []
