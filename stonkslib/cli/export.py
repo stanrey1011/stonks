@@ -1,24 +1,32 @@
 import click
 import json
 from pathlib import Path
-from stonkslib.cli.analyze import stocks, options
-from stonkslib.cli.clean import load_tickers
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 @click.command()
-@click.option('--output', default='output.json', help='Output file for LLM')
-@click.option('--data-type', type=click.Choice(['stocks', 'options']), default='stocks')
-@click.option('--strategy', default=None, help='Strategy for options analysis')
-@click.option('--side', type=click.Choice(['buy', 'sell']), default=None, help='Buy or sell side for options')
-@click.option('--option_type', type=click.Choice(['calls', 'puts']), default=None, help='Option type for options')
-def export(output, data_type, strategy, side, option_type):
-    """Export analysis results as JSON for LLM."""
-    results = []
-    if data_type == 'stocks':
-        results = stocks.callback(ticker=None, interval='1d')
-    else:
-        results = options.callback(ticker=None, strategy=strategy, side=side, option_type=option_type)
+@click.option("--output", default="output.json", help="Output file path")
+@click.option("--ticker", default=None, help="Single ticker to export")
+@click.option("--interval", default="1d", show_default=True)
+def export(output, ticker, interval):
+    """Export clean analysis data as JSON for LLM consumption."""
+    from stonkslib.utils.load_td import load_td
+    import yaml
+
+    ticker_yaml = PROJECT_ROOT / "tickers.yaml"
+    with open(ticker_yaml) as f:
+        data = yaml.safe_load(f) or {}
+    all_tickers = [t for items in data.values() for t in (items or [])]
+    tickers = [ticker.upper()] if ticker else all_tickers
+
+    td = load_td(tickers, interval)
+    results = {}
+    for t, df in td.items():
+        if df is not None and not df.empty:
+            results[t] = json.loads(df.tail(30).to_json(orient="records", date_format="iso"))
+
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"[✓] Exported {data_type} analysis to {output_path}")
+    print(f"[✓] Exported {len(results)} ticker(s) to {output_path}")

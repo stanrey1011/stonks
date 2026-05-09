@@ -1,6 +1,5 @@
 import click
 import yaml
-import json
 import requests
 from pathlib import Path
 from stonkslib.utils.logging import setup_logging
@@ -11,14 +10,25 @@ TICKER_YAML = PROJECT_ROOT / "tickers.yaml"
 logger = setup_logging(PROJECT_ROOT / "log", "alert.log")
 
 
-def _load_all_tickers():
+def _resolve_tickers(target):
     with open(TICKER_YAML) as f:
-        data = yaml.safe_load(f)
-    return [t for category in data.values() for t in category]
+        data = yaml.safe_load(f) or {}
+    if not target or target.lower() == "all":
+        return [t for items in data.values() for t in (items or [])]
+    for cat, tickers in data.items():
+        if cat.lower() == target.lower():
+            return tickers or []
+    return [target.upper()]
 
 
 def _load_all_strategies():
-    return [p for p in STRATEGY_DIR.glob("*.yaml")]
+    return list(STRATEGY_DIR.glob("*.yaml"))
+
+
+def _resolve_strategy_path(path):
+    """Return optimized version of a strategy if it exists, else original."""
+    opt_path = STRATEGY_DIR / "optimized" / f"{path.stem}_optimized.yaml"
+    return opt_path if opt_path.exists() else path
 
 
 def _print_signals(all_signals):
@@ -75,40 +85,37 @@ def _send_discord(webhook_url, all_signals, interval):
 
 
 @click.command()
+@click.argument("target", required=False, default=None,
+                metavar="[TICKER|CATEGORY|all]")
 @click.option("--strategy", default=None,
               help="Strategy YAML filename (e.g. rsi.yaml). Omit for --all-strategies.")
 @click.option("--all-strategies", "all_strategies", is_flag=True,
-              help="Scan using all strategy YAMLs in stonkslib/strategies/")
-@click.option("--ticker", default=None,
-              help="Single ticker to check (e.g. AAPL).")
-@click.option("--all-tickers", "all_tickers", is_flag=True,
-              help="Check all tickers in tickers.yaml")
+              help="Scan using all strategy YAMLs")
 @click.option("--interval",
               type=click.Choice(["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]),
               default="1d", show_default=True)
-@click.option("--use-optimized", "use_optimized", is_flag=True,
-              help="Use optimized YAML from stonkslib/strategies/optimized/ if available")
 @click.option("--webhook-url", "webhook_url", default=None, envvar="STONKS_DISCORD_WEBHOOK",
-              help="Discord webhook URL to post signals to (or set STONKS_DISCORD_WEBHOOK env var)")
-def alert(strategy, all_strategies, ticker, all_tickers, interval, use_optimized, webhook_url):
-    """Scan latest bar for entry/exit signals across strategies and tickers.
+              help="Discord webhook URL (or set STONKS_DISCORD_WEBHOOK env var)")
+def alert(target, strategy, all_strategies, interval, webhook_url):
+    """Scan latest bar for entry/exit signals. Auto-uses optimized strategies when available.
+
+    TARGET can be a ticker (AAPL), a category (stocks/etfs/crypto), or 'all'.\n
 
     Examples:\n
-      stonks alert --strategy rsi.yaml --ticker AAPL\n
-      stonks alert --all-strategies --all-tickers --interval 1d\n
-      stonks alert --strategy rsi.yaml --all-tickers --use-optimized\n
-      stonks alert --strategy rsi.yaml --all-tickers --webhook-url https://discord.com/api/webhooks/...
+      stonks alert AAPL --strategy rsi.yaml\n
+      stonks alert all --all-strategies --interval 1d\n
+      stonks alert crypto --all-strategies --interval 1wk
     """
     from stonkslib.alerts.signals import check_signals
 
+    if not target:
+        print("[!] Provide a ticker (AAPL), category (stocks/etfs/crypto), or 'all'")
+        return
     if not strategy and not all_strategies:
         print("[!] Provide --strategy <file> or --all-strategies")
         return
-    if not ticker and not all_tickers:
-        print("[!] Provide --ticker <TICKER> or --all-tickers")
-        return
 
-    tickers = _load_all_tickers() if all_tickers else [ticker]
+    tickers = _resolve_tickers(target)
 
     if all_strategies:
         strategy_paths = _load_all_strategies()
@@ -124,16 +131,15 @@ def alert(strategy, all_strategies, ticker, all_tickers, interval, use_optimized
     all_signals = []
 
     for path in strategy_paths:
-        if use_optimized:
-            opt_path = STRATEGY_DIR / "optimized" / f"{path.stem}_optimized.yaml"
-            if opt_path.exists():
-                path = opt_path
+        resolved = _resolve_strategy_path(path)
+        if resolved != path:
+            logger.info(f"[opt] Using optimized: {resolved.name}")
 
-        with open(path) as f:
+        with open(resolved) as f:
             strat = yaml.safe_load(f)
 
         strat_name = strat.get("name", path.stem)
-        print(f"\nStrategy: {strat_name}  ({path.name})")
+        print(f"\nStrategy: {strat_name}  ({resolved.name})")
 
         for t in tickers:
             signals = check_signals(t, interval, strat)
