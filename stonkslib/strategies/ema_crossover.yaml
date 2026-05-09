@@ -1,0 +1,26 @@
+name: "EMA 9/21 Crossover"
+description: "Fast EMA 9 / slow EMA 21 crossover. Swing trade entries on bullish cross, exit on bearish cross or RSI overbought."
+indicators:
+  ma_double:
+    enabled: true
+    params:
+      swing: 9
+      long: 21
+  rsi:
+    enabled: false
+  macd:
+    enabled: false
+  bollinger:
+    enabled: false
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2
+  stop_loss_pct: 0.06
+  slippage: 0.0005

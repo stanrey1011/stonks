@@ -1,0 +1,28 @@
+name: "Supertrend"
+description: "Buy when Supertrend flips bullish, sell when it flips bearish. Clean trend-following for swing and long-term trades."
+indicators:
+  supertrend:
+    enabled: true
+    params:
+      period: 10
+      multiplier: 3.0
+  rsi:
+    enabled: false
+  macd:
+    enabled: false
+  bollinger:
+    enabled: false
+  ma_double:
+    enabled: false
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2
+  stop_loss_pct: 0.0
+  slippage: 0.0005

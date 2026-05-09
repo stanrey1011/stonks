@@ -6,6 +6,8 @@ from stonkslib.indicators.rsi import rsi as calc_rsi
 from stonkslib.indicators.macd import macd as calc_macd
 from stonkslib.indicators.bollinger import bollinger_bands
 from stonkslib.indicators.moving_avg_double import moving_averages
+from stonkslib.indicators.supertrend import supertrend as calc_supertrend
+from stonkslib.indicators.rsi_divergence import rsi_divergence as calc_rsi_div
 from stonkslib.utils.load_td import load_td
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,21 @@ def check_signals(ticker, interval, strategy):
                                  long_window=p.get("long", 50), ma_type="EMA")
         ma_swing_series = ma_out["MA_Swing"]
         ma_long_series = ma_out["MA_Long"]
+
+    st_series = None
+    st_cfg = ind.get("supertrend", {})
+    if st_cfg.get("enabled"):
+        p = st_cfg.get("params", {})
+        st_out = calc_supertrend(df.copy(), period=p.get("period", 10),
+                                 multiplier=p.get("multiplier", 3.0))
+        st_series = st_out
+
+    div_series = None
+    div_cfg = ind.get("rsi_divergence", {})
+    if div_cfg.get("enabled"):
+        p = div_cfg.get("params", {})
+        div_series = calc_rsi_div(df.copy(), period=p.get("period", 14),
+                                  lookback=p.get("lookback", 20))
 
     # Check only the last two bars (need previous bar for crossover detection)
     last_idx = len(df) - 1
@@ -123,5 +140,23 @@ def check_signals(ticker, interval, strategy):
         prev_ml = float(ma_long_series.iloc[last_idx - 1])
         if prev_sw >= prev_ml and sw < ml:
             signals.append(sig("SELL", "MA Bearish Crossover"))
+
+    # --- Supertrend signals ---
+    if st_series is not None and last_idx >= 1:
+        prev_dir = st_series["Direction"].iloc[last_idx - 1]
+        curr_dir = st_series["Direction"].iloc[last_idx]
+        if prev_dir == -1 and curr_dir == 1:
+            signals.append(sig("BUY", "Supertrend flipped bullish"))
+        elif prev_dir == 1 and curr_dir == -1:
+            signals.append(sig("SELL", "Supertrend flipped bearish"))
+
+    # --- RSI Divergence signals ---
+    if div_series is not None:
+        if div_series["Bullish_Divergence"].iloc[last_idx]:
+            rsi_val = div_series["RSI"].iloc[last_idx]
+            signals.append(sig("BUY", f"Bullish RSI divergence (RSI={rsi_val:.1f})"))
+        if div_series["Bearish_Divergence"].iloc[last_idx]:
+            rsi_val = div_series["RSI"].iloc[last_idx]
+            signals.append(sig("SELL", f"Bearish RSI divergence (RSI={rsi_val:.1f})"))
 
     return signals if signals else []

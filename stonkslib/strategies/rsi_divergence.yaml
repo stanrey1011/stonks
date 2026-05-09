@@ -1,0 +1,28 @@
+name: "RSI Divergence"
+description: "Buy on bullish RSI divergence (price lower low, RSI higher low). Sell on bearish divergence. Strong reversal signal for LEAPS entries."
+indicators:
+  rsi_divergence:
+    enabled: true
+    params:
+      period: 14
+      lookback: 20
+  rsi:
+    enabled: false
+  macd:
+    enabled: false
+  bollinger:
+    enabled: false
+  ma_double:
+    enabled: false
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.25
+  stop_loss_pct: 0.10
+  slippage: 0.0005

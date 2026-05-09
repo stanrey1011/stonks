@@ -8,6 +8,8 @@ from stonkslib.indicators.rsi import rsi as calc_rsi
 from stonkslib.indicators.macd import macd as calc_macd
 from stonkslib.indicators.bollinger import bollinger_bands
 from stonkslib.indicators.moving_avg_double import moving_averages
+from stonkslib.indicators.supertrend import supertrend as calc_supertrend
+from stonkslib.indicators.rsi_divergence import rsi_divergence as calc_rsi_div
 from stonkslib.utils.load_td import load_td
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +72,20 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
                                  long_window=p.get("long", 50), ma_type="EMA")
         ma_swing_series = ma_out["MA_Swing"]
         ma_long_series = ma_out["MA_Long"]
+
+    st_series = None
+    st_cfg = ind.get("supertrend", {})
+    if st_cfg.get("enabled"):
+        p = st_cfg.get("params", {})
+        st_series = calc_supertrend(df.copy(), period=p.get("period", 10),
+                                    multiplier=p.get("multiplier", 3.0))
+
+    div_series = None
+    div_cfg = ind.get("rsi_divergence", {})
+    if div_cfg.get("enabled"):
+        p = div_cfg.get("params", {})
+        div_series = calc_rsi_div(df.copy(), period=p.get("period", 14),
+                                  lookback=p.get("lookback", 20))
 
     pos = 0.0
     entry_price = None
@@ -138,6 +154,16 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
                 if prev_sw <= prev_ml and sw > ml:
                     pending, pending_reason = "buy", "MA Bullish Crossover"
 
+            if pending is None and st_series is not None and idx > 0:
+                prev_dir = st_series["Direction"].iloc[idx - 1]
+                curr_dir = st_series["Direction"].iloc[idx]
+                if prev_dir == -1 and curr_dir == 1:
+                    pending, pending_reason = "buy", "Supertrend flipped bullish"
+
+            if pending is None and div_series is not None:
+                if div_series["Bullish_Divergence"].iloc[idx]:
+                    pending, pending_reason = "buy", "Bullish RSI divergence"
+
         # --- Generate exit signal (fills at next bar's open) ---
         elif pos > 0 and pending is None:
             if r is not None and r > rsi_overbought:
@@ -149,6 +175,13 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
                 prev_ml = float(ma_long_series.iloc[idx - 1])
                 if prev_sw >= prev_ml and sw < ml:
                     pending, pending_reason = "sell", "MA Bearish Crossover"
+            elif st_series is not None and idx > 0:
+                prev_dir = st_series["Direction"].iloc[idx - 1]
+                curr_dir = st_series["Direction"].iloc[idx]
+                if prev_dir == 1 and curr_dir == -1:
+                    pending, pending_reason = "sell", "Supertrend flipped bearish"
+            elif div_series is not None and div_series["Bearish_Divergence"].iloc[idx]:
+                pending, pending_reason = "sell", "Bearish RSI divergence"
             elif stop_loss_pct > 0 and entry_price and close < entry_price * (1 - stop_loss_pct):
                 pending, pending_reason = "sell", "Stop Loss"
 
