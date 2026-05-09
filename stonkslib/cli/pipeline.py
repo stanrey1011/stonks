@@ -80,8 +80,7 @@ def pipeline(target, interval, force):
       stonks pipeline all --interval 1d --force
     """
     if not target:
-        print("[!] Provide a ticker (AAPL), category (stocks/etfs/crypto), or 'all'")
-        return
+        target = "all"
 
     tickers = _resolve_tickers(target)
     if not tickers:

@@ -22,9 +22,26 @@ def _resolve_tickers(target):
     return [target.upper()]
 
 
-@click.group()
+class DefaultToData(click.Group):
+    """Routes to the 'data' subcommand when no recognized subcommand is given."""
+    def resolve_command(self, ctx, args):
+        if not args or args[0] not in self.commands:
+            args.insert(0, "data")
+        return super().resolve_command(ctx, args)
+
+
+@click.group(cls=DefaultToData)
 def clean():
-    """Clean raw OHLCV or options data."""
+    """Clean raw OHLCV or options data.
+
+    With no subcommand, cleans OHLCV data (shortcut for 'clean data').\n
+
+    Examples:\n
+      stonks clean               (all tickers, all intervals)\n
+      stonks clean AAPL\n
+      stonks clean crypto --interval 1d\n
+      stonks clean options AAPL
+    """
 
 
 @clean.command()
@@ -34,18 +51,9 @@ def clean():
               help="Specific interval (default: all)")
 @click.option("--force", is_flag=True, help="Overwrite existing clean files")
 def data(target, interval, force):
-    """Clean OHLCV data for a ticker, category, or all.
-
-    TARGET can be a ticker (AAPL), a category (stocks/etfs/crypto), or 'all'.\n
-
-    Examples:\n
-      stonks clean data AAPL\n
-      stonks clean data crypto --interval 1d\n
-      stonks clean data all --force
-    """
+    """Clean OHLCV data. Target defaults to all tickers."""
     if not target:
-        print("[!] Provide a ticker (AAPL), category (stocks/etfs/crypto), or 'all'")
-        return
+        target = "all"
 
     tickers = _resolve_tickers(target)
     intervals = [interval] if interval else INTERVALS

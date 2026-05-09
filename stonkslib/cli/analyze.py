@@ -39,8 +39,7 @@ def analyze(target, interval):
       stonks analyze all
     """
     if not target:
-        print("[!] Provide a ticker (AAPL), category (stocks/etfs/crypto), or 'all'")
-        return
+        target = "all"
 
     tickers = _resolve_tickers(target)
 

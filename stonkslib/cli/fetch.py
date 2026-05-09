@@ -28,9 +28,26 @@ def _resolve_tickers(target):
     return [target.upper()], None
 
 
-@click.group()
+class DefaultToData(click.Group):
+    """Routes to the 'data' subcommand when no recognized subcommand is given."""
+    def resolve_command(self, ctx, args):
+        if not args or args[0] not in self.commands:
+            args.insert(0, "data")
+        return super().resolve_command(ctx, args)
+
+
+@click.group(cls=DefaultToData)
 def fetch():
-    """Fetch raw OHLCV data for tickers."""
+    """Fetch raw OHLCV or options data.
+
+    With no subcommand, fetches OHLCV data (shortcut for 'fetch data').\n
+
+    Examples:\n
+      stonks fetch               (all tickers)\n
+      stonks fetch AAPL\n
+      stonks fetch crypto\n
+      stonks fetch --force
+    """
 
 
 @fetch.command()
@@ -38,18 +55,9 @@ def fetch():
                 metavar="[TICKER|CATEGORY|all]")
 @click.option("--force", is_flag=True, help="Force re-download even if data is fresh")
 def data(target, force):
-    """Fetch OHLCV data for a ticker, category, or all.
-
-    TARGET can be a ticker (AAPL), a category (stocks/etfs/crypto), or 'all'.\n
-
-    Examples:\n
-      stonks fetch data AAPL\n
-      stonks fetch data crypto\n
-      stonks fetch data all --force
-    """
+    """Fetch OHLCV data. Target defaults to all tickers."""
     if not target:
-        print("[!] Provide a ticker (AAPL), category (stocks/etfs/crypto), or 'all'")
-        return
+        target = "all"
 
     tickers, category = _resolve_tickers(target)
     if not tickers:
