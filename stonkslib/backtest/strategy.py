@@ -22,7 +22,25 @@ def load_strategy(yaml_path):
         return yaml.safe_load(f)
 
 
+def _ticker_category(ticker):
+    try:
+        import yaml
+        with open(PROJECT_ROOT / "tickers.yaml") as f:
+            data = yaml.safe_load(f) or {}
+        for category, tickers in data.items():
+            if tickers and ticker in tickers:
+                return category
+    except Exception:
+        pass
+    return None
+
+
 def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
+    exclude = strategy.get("exclude_categories", [])
+    if exclude and _ticker_category(ticker) in exclude:
+        logger.info(f"[skip] {ticker} excluded from '{strategy.get('name')}' (category filter)")
+        return None
+
     data = load_td([ticker], interval)
     df = data.get(ticker)
     if df is None or df.empty:

@@ -1,4 +1,5 @@
 import logging
+import yaml
 import pandas as pd
 from pathlib import Path
 
@@ -12,9 +13,30 @@ from stonkslib.utils.load_td import load_td
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _ticker_category(ticker):
+    """Return the category (stocks/crypto/etfs) for a ticker from tickers.yaml."""
+    try:
+        with open(PROJECT_ROOT / "tickers.yaml") as f:
+            data = yaml.safe_load(f) or {}
+        for category, tickers in data.items():
+            if tickers and ticker in tickers:
+                return category
+    except Exception:
+        pass
+    return None
+
 
 def check_signals(ticker, interval, strategy):
     """Check if the latest bar fires an entry or exit signal for a given strategy."""
+    exclude = strategy.get("exclude_categories", [])
+    if exclude:
+        category = _ticker_category(ticker)
+        if category in exclude:
+            return []
+
     data = load_td([ticker], interval)
     df = data.get(ticker)
     if df is None or df.empty:
