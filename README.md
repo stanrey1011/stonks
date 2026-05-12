@@ -1,6 +1,6 @@
 # Stonks
 
-A local-first quantitative trading toolkit for stocks, ETFs, and crypto. Fetches and cleans OHLCV data from Yahoo Finance, runs technical indicator analysis, backtests YAML-defined strategies, optimizes parameters via local LLM (Ollama), and delivers daily trade alerts to Discord — all from a single CLI.
+A local-first quantitative trading toolkit for stocks, ETFs, and crypto. Fetches and cleans OHLCV data from Yahoo Finance, runs technical indicator analysis, backtests YAML-defined strategies, optimizes parameters via local LLM (Ollama), scans for LEAP options opportunities, and delivers daily trade alerts to Discord — all from a single CLI.
 
 ---
 
@@ -12,9 +12,13 @@ A local-first quantitative trading toolkit for stocks, ETFs, and crypto. Fetches
 - **Chart patterns** — Head & Shoulders, Triangles, Double tops/bottoms, Wedges
 - **YAML strategies** — define indicator combos, thresholds, and risk params in plain text
 - **Backtesting** — realistic fills at next bar open with configurable slippage
-- **LLM optimization** — Ollama-driven parameter tuning; optimized YAMLs auto-applied on alert
-- **Daily alerts** — systemd timer posts BUY/SELL signals to Discord every weekday at 4:30pm ET
-- **Discord bot** — manage watchlist, run scans, backtest, and kick off optimization from chat
+- **Per-ticker optimization** — Ollama-driven parameter tuning; saves per-ticker YAMLs to avoid cross-ticker skew
+- **LEAP options scanner** — VIX rank as IV proxy + live options chain; ranks call/put opportunities across watchlist
+- **LEAP backtesting** — Black-Scholes simulation; exits on stop-loss or expiry only (you decide when to sell)
+- **LEAP optimization** — scores strategies by avg trade % return (not net P&L) for options-appropriate tuning
+- **Daily alerts** — cron job posts BUY/SELL signals + LEAP scan to Discord every weekday at 4:30pm ET
+- **Discord bot** — manage watchlist, run scans, backtest, optimize, and scan LEAPs from chat
+- **Open WebUI tool** — all features accessible via the LLM chat interface (install `owui_tool.py` as a Tool)
 - **Data freshness view** — `stonks status` shows what data you have and what's been optimized
 
 ---
@@ -45,7 +49,6 @@ stocks:
   - TSLA
   - NVDA
   - MSFT
-  - BBAI
 etfs:
   - SPY
   - QQQ
@@ -77,9 +80,9 @@ DISCORD_BOT_TOKEN=your.bot.token.here
 
 ## CLI Reference
 
-All data commands accept a positional target: a ticker symbol, a category (`stocks`/`etfs`/`crypto`), or `all`. No flags needed.
+All data commands accept a positional target: a ticker symbol, a category (`stocks`/`etfs`/`crypto`), or `all`.
 
-### Quick Pipeline
+### Pipeline
 
 ```sh
 stonks pipeline            # fetch → clean → analyze all tickers (1d)
@@ -88,36 +91,14 @@ stonks pipeline crypto     # all crypto
 stonks pipeline all --interval 1wk --force
 ```
 
-### Fetch
+### Fetch / Clean / Analyze
 
 ```sh
 stonks fetch               # all tickers
 stonks fetch AAPL          # single ticker (doesn't add to watchlist)
-stonks fetch crypto        # all crypto
-stonks fetch stocks --force
-stonks fetch options buy leaps --ticker AAPL
+stonks clean AAPL --interval 1d
+stonks analyze all --interval 1wk
 ```
-
-Fetching a single ticker without `stonks tickers add` is good for quick one-off backtesting without polluting the watchlist.
-
-### Clean
-
-```sh
-stonks clean               # all tickers, all intervals
-stonks clean AAPL
-stonks clean etfs --interval 1d
-stonks clean options AAPL
-```
-
-### Analyze
-
-```sh
-stonks analyze             # all tickers (1d)
-stonks analyze AAPL --interval 1wk
-stonks analyze crypto
-```
-
-Runs indicators, detects patterns, and merges signals into combined CSVs.
 
 ### Backtest
 
@@ -127,17 +108,23 @@ stonks backtest all --all-strategies --interval 1d
 stonks backtest stocks --all-strategies --interval 1wk
 ```
 
-Prints a ranked summary table sorted by avg P&L. Optimized YAMLs are used automatically if present.
+Prints a ranked summary table sorted by net P&L. Optimized YAMLs are used automatically if present.
 
 ### Optimize
 
 ```sh
-stonks optimize --strategy rsi.yaml --ticker AAPL --iterations 5
+# Global optimized YAML (one file per strategy)
 stonks optimize --all-strategies --all-tickers --iterations 3
-stonks optimize --strategy rsi.yaml --all-tickers --model qwen2.5:32b
+
+# Per-ticker YAMLs (avoids cross-ticker parameter skew)
+stonks optimize --all-strategies --per-ticker --all-tickers --iterations 3
+
+# LEAP-specific per-ticker optimization (scores by avg trade %, not net P&L)
+stonks optimize --all-strategies --per-ticker --leaps --option-type call --all-tickers
+stonks optimize --all-strategies --per-ticker --leaps --option-type put --all-tickers
 ```
 
-Uses local Ollama to iteratively tune strategy parameters. Saves results to `stonkslib/strategies/optimized/`.
+Uses local Ollama to iteratively tune strategy parameters. Requires `ollama serve`. Default model: `qwen2.5:7b`. Use `--model qwen2.5:32b` for better results (slower).
 
 ### Alert
 
@@ -147,7 +134,27 @@ stonks alert AAPL --strategy rsi.yaml --interval 1wk
 stonks alert crypto --all-strategies
 ```
 
-Scans the latest bar for entry/exit signals. Automatically uses optimized YAMLs when available. Posts to Discord via `STONKS_DISCORD_WEBHOOK`.
+Scans the latest bar for entry/exit signals. Per-ticker optimized YAMLs are used automatically. Posts to Discord via `STONKS_DISCORD_WEBHOOK`.
+
+### LEAP Options
+
+```sh
+# Scan watchlist for LEAP opportunities (VIX rank + live options chain)
+stonks leaps stocks
+stonks leaps all --interval 1wk --webhook-url $STONKS_DISCORD_WEBHOOK
+
+# Backtest LEAP strategies using Black-Scholes pricing
+stonks leaps-backtest NVDA --option-type call --interval 1wk
+stonks leaps-backtest NVDA --option-type auto   # picks call/put per signal direction
+stonks leaps-backtest NVDA --option-type put --stop-loss 0.4
+
+# Show entry/exit trade log (to verify on a chart)
+stonks leaps-trades NVDA
+stonks leaps-trades NVDA --option-type call --strategy supertrend
+stonks leaps-trades NVDA --option-type put --strategy "rsi macd"
+```
+
+LEAP exits are stop-loss (50% premium loss) or expiry only — no automatic signal-based exits.
 
 ### Status
 
@@ -157,13 +164,13 @@ stonks status
 
 Shows watchlist, data freshness per ticker/interval, and which strategies have been optimized.
 
-### Discord Bot
+---
+
+## Discord Bot
 
 ```sh
 stonks bot
 ```
-
-Bot commands in Discord:
 
 | Command | What it does |
 |---|---|
@@ -176,8 +183,12 @@ Bot commands in Discord:
 | `!alert AAPL 1wk` | Scan single ticker, weekly interval |
 | `!backtest AAPL` | Backtest all strategies for a ticker |
 | `!backtest AAPL 1wk` | Weekly backtest |
-| `!optimize AAPL` | Optimize strategies for a ticker |
-| `!optimize` | Optimize everything |
+| `!optimize AAPL` | Per-ticker optimize all strategies |
+| `!optimize AAPL leaps call` | LEAP-specific optimization |
+| `!leaps` | Scan watchlist for LEAP opportunities |
+| `!leaps-backtest NVDA call` | Run LEAP backtest |
+| `!leaps-backtest NVDA put 1d` | Daily interval put backtest |
+| `!leaps-trades NVDA` | Show LEAP entry/exit dates |
 
 ---
 
@@ -200,13 +211,32 @@ journalctl --user -u stonks-bot -f           # live bot logs
 journalctl --user -u stonks-alert -f         # alert scan logs
 ```
 
-Alert timer fires every weekday at 20:30 UTC (4:30pm ET).
+Alert timer fires every weekday at 20:30 UTC (4:30pm ET). Runs the regular signal scan followed by a LEAP options scan, posting both to Discord.
+
+---
+
+## Open WebUI
+
+Install `stonkslib/owui_tool.py` as a Tool in Open WebUI (Workspace → Tools → paste file content). Exposes all features to the LLM chat interface:
+
+| Tool | What it does |
+|---|---|
+| `get_watchlist` | Show current watchlist |
+| `add_ticker` / `remove_ticker` | Manage watchlist |
+| `scan_ticker` / `scan_watchlist` | BUY/SELL signals |
+| `backtest_ticker` | Strategy backtest |
+| `optimize_ticker` | Per-ticker LLM optimization |
+| `get_trades` | Strategy trade log |
+| `scan_leaps` | LEAP opportunity scan |
+| `leaps_backtest` | LEAP backtest |
+| `get_leaps_trades` | LEAP entry/exit dates |
+| `optimize_leaps` | LEAP-specific optimization |
 
 ---
 
 ## Strategies
 
-Defined in `stonkslib/strategies/*.yaml`. Edit params directly or run `stonks optimize` to let the LLM tune them. Optimized YAMLs are auto-applied during alert and backtest runs.
+Defined in `stonkslib/strategies/*.yaml`. Edit params directly or run `stonks optimize` to let the LLM tune them.
 
 | Strategy | File | Notes |
 |---|---|---|
@@ -218,32 +248,26 @@ Defined in `stonkslib/strategies/*.yaml`. Edit params directly or run `stonks op
 | Supertrend | `supertrend.yaml` | ATR-based; **excludes crypto** |
 | RSI Divergence | `rsi_divergence.yaml` | Price/RSI disagreement signals |
 
-Strategies support `exclude_categories: [crypto]` to skip categories automatically.
+Optimized YAMLs are saved to `stonkslib/strategies/optimized/`. The lookup priority is:
+1. `{name}_{ticker}_leaps_{type}_optimized.yaml` — LEAP-specific per-ticker
+2. `{name}_{ticker}_optimized.yaml` — per-ticker
+3. `{name}_optimized.yaml` — global
+4. `{name}.yaml` — base
 
-Example strategy YAML:
+---
 
-```yaml
-name: RSI Only
-exclude_categories: []
-indicators:
-  rsi:
-    enabled: true
-    params:
-      period: 14
-      overbought: 70
-      oversold: 30
-risk:
-  start_cash: 10000
-  risk_per_trade: 0.2
-  stop_loss_pct: 0.1
-  slippage: 0.0005
-```
+## LEAP Backtest Design
+
+- **Pricing**: Black-Scholes using 30-bar rolling realized volatility as IV proxy
+- **IV environment**: VIX 52-week percentile rank shown in scanner output
+- **Position sizing**: Fixed at `start_cash × risk_per_trade` (not compounding) — prevents unrealistic exponential growth
+- **Exits**: Stop-loss at 50% premium loss OR expiry (< 14 days remaining). No signal-based exits
+- **`--option-type auto`**: picks call on BUY signals, put on SELL signals
+- **Optimization scoring**: avg % return per trade (not net P&L) to avoid premium-size bias
 
 ---
 
 ## Data Lookback (yfinance)
-
-Historical data is fetched at 10 years for daily and weekly intervals to capture major market events (COVID crash, 2022 bear market).
 
 | Interval | Lookback |
 |---|---|
@@ -261,31 +285,24 @@ Historical data is fetched at 10 years for daily and weekly intervals to capture
 stonks/
 ├── stonkslib/
 │   ├── alerts/         # Signal detection logic
-│   ├── backtest/       # Backtesting engine (strategy.py)
+│   ├── backtest/       # strategy.py (equity) + leaps.py (Black-Scholes)
 │   ├── bot/            # Discord bot
 │   ├── cli/            # CLI commands
 │   ├── dash/           # Streamlit dashboard
 │   ├── indicators/     # RSI, MACD, Bollinger, MA, Supertrend, RSI Divergence
+│   ├── leaps/          # LEAP scanner (VIX rank + live options chain)
 │   ├── llm/            # Ollama optimization loop
 │   ├── patterns/       # Chart pattern detectors
 │   ├── strategies/     # YAML strategy configs
-│   │   └── optimized/  # LLM-tuned YAMLs (auto-generated)
-│   └── utils/          # Shared helpers
+│   │   └── optimized/  # LLM-tuned YAMLs (auto-generated, gitignored)
+│   ├── utils/          # Shared helpers
+│   └── owui_tool.py    # Open WebUI Tools class
 ├── data/               # Fetched/cleaned data (gitignored)
-├── scripts/            # daily_alert.sh
+├── scripts/            # daily_alert.sh (cron)
 ├── tickers.yaml        # Watchlist
 ├── .env                # Discord webhook + bot token (gitignored)
 └── requirements.txt
 ```
-
----
-
-## Roadmap
-
-- [ ] News + sentiment layer in alerts
-- [ ] Interactive Brokers paper trading via `ib_insync`
-- [ ] LEAPS options backtesting via ThetaData
-- [ ] OpenClaw / LLM natural language query integration
 
 ---
 
