@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import yaml
 import pandas as pd
 from pathlib import Path
@@ -232,10 +233,11 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
         "slippage_pct": slippage,
     }
 
-    out_dir = Path(output_dir or OUTPUT_BASE) / ticker
+    strategy_slug = re.sub(r"[^a-z0-9]+", "_", strategy.get("name", "unknown").lower()).strip("_")
+    out_dir = Path(output_dir or OUTPUT_BASE) / ticker / interval
     out_dir.mkdir(parents=True, exist_ok=True)
-    results_df.to_csv(out_dir / f"{interval}.csv", index=False)
-    with open(out_dir / f"{interval}_metrics.json", "w") as f:
+    results_df.to_csv(out_dir / f"{strategy_slug}.csv", index=False)
+    with open(out_dir / f"{strategy_slug}_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
 
     logger.info(f"[✓] {ticker} ({interval}) — P&L: ${total_pnl:.2f}, Trades: {num_trades}, Win rate: {win_rate:.1%}")

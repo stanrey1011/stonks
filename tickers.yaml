@@ -4,9 +4,36 @@ crypto:
 etfs:
 - SPY
 - QQQ
+- EART
+- NUKZ
 stocks:
 - AAPL
 - TSLA
 - NVDA
 - MSFT
 - BBAI
+- SOFI
+- DNN
+- LAC
+- WULF
+- USAR
+- AMD
+- IREN
+- UUUU
+- MRVL
+- AMZN
+- AMAT
+- AU
+- MP
+- AVGO
+- GLD
+- NFLX
+- XOM
+- WPM
+- ACHR
+- NEGG
+- RR
+- QBTS
+- PYPL
+- TMQ
+- UMAC

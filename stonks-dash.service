@@ -1,0 +1,13 @@
+[Unit]
+Description=Stonks Web Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/as/stonks
+ExecStart=/home/as/stonks/venv/bin/stonks dash
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

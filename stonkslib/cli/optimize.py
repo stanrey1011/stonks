@@ -54,7 +54,10 @@ def _print_summary(results):
 @click.option("--ticker", default=None,
               help="Single ticker to optimize against (e.g. AAPL).")
 @click.option("--all-tickers", "all_tickers", is_flag=True,
-              help="Optimize across all tickers in tickers.yaml (averaged P&L)")
+              help="Optimize across all tickers in tickers.yaml")
+@click.option("--per-ticker", "per_ticker", is_flag=True,
+              help="Save a separate optimized YAML per ticker (e.g. rsi_AAPL_optimized.yaml). "
+                   "Without this flag, all tickers are averaged into one global file.")
 @click.option("--interval",
               type=click.Choice(["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]),
               default="1d", show_default=True)
@@ -62,13 +65,23 @@ def _print_summary(results):
               help="Number of LLM optimization iterations per strategy")
 @click.option("--model", default="qwen2.5:7b", show_default=True,
               help="Ollama model to use")
-def optimize(strategy, all_strategies, ticker, all_tickers, interval, iterations, model):
+@click.option("--leaps", "use_leaps", is_flag=True,
+              help="Score against the LEAP backtest (Black-Scholes pricing) instead of equity. "
+                   "Saves separate _leaps_{type}_optimized.yaml files.")
+@click.option("--option-type", "option_type",
+              type=click.Choice(["call", "put", "auto"]), default="auto", show_default=True,
+              help="Option direction for LEAP optimization (only used with --leaps)")
+def optimize(strategy, all_strategies, ticker, all_tickers, per_ticker, interval, iterations, model, use_leaps, option_type):
     """LLM-driven parameter optimization across strategies and tickers.
 
+    Use --per-ticker to save a separate optimized YAML per ticker.
+    Use --leaps to optimize signal params for LEAP options instead of equity —
+    the LLM scores on avg trade return % and biases toward fewer, stronger signals.
+
     Examples:\n
-      stonks optimize --strategy rsi_macd.yaml --ticker AAPL --iterations 5\n
-      stonks optimize --all-strategies --ticker AAPL --iterations 5\n
-      stonks optimize --strategy rsi_macd.yaml --all-tickers --iterations 5\n
+      stonks optimize --strategy rsi.yaml --ticker AAPL --per-ticker\n
+      stonks optimize --strategy rsi.yaml --ticker NVDA --leaps --option-type call\n
+      stonks optimize --all-strategies --all-tickers --per-ticker --leaps --option-type put\n
       stonks optimize --all-strategies --all-tickers --iterations 3
     """
     from stonkslib.llm.optimizer import optimize as run_optimize
@@ -91,25 +104,41 @@ def optimize(strategy, all_strategies, ticker, all_tickers, interval, iterations
         return
 
     results = {}
+
     for path in strategy_paths:
         name = load_strategy(path).get("name", path.stem)
-        print(f"\n{'─'*50}")
-        print(f"Strategy: {name}  |  Tickers: {tickers}  |  Iterations: {iterations}")
-        print(f"{'─'*50}")
 
-        result = run_optimize(
-            strategy_path=path,
-            tickers=tickers,
-            interval=interval,
-            iterations=iterations,
-            model=model,
-        )
+        mode_label = f"LEAP {option_type}" if use_leaps else "equity"
 
-        out_path = ""
-        if result:
-            from stonkslib.llm.optimizer import OPTIMIZED_DIR
-            out_path = str(OPTIMIZED_DIR / f"{path.stem}_optimized.yaml")
-
-        results[name] = {**(result or {}), "out_path": out_path}
+        if per_ticker:
+            for t in tickers:
+                print(f"\n{'─'*50}")
+                print(f"Strategy: {name}  |  Ticker: {t}  |  {mode_label}  |  Iterations: {iterations}")
+                print(f"{'─'*50}")
+                result = run_optimize(
+                    strategy_path=path,
+                    tickers=[t],
+                    interval=interval,
+                    iterations=iterations,
+                    model=model,
+                    output_ticker=t,
+                    use_leaps=use_leaps,
+                    option_type=option_type,
+                )
+                results[f"{name} / {t}"] = result or {}
+        else:
+            print(f"\n{'─'*50}")
+            print(f"Strategy: {name}  |  Tickers: {tickers}  |  {mode_label}  |  Iterations: {iterations}")
+            print(f"{'─'*50}")
+            result = run_optimize(
+                strategy_path=path,
+                tickers=tickers,
+                interval=interval,
+                iterations=iterations,
+                model=model,
+                use_leaps=use_leaps,
+                option_type=option_type,
+            )
+            results[name] = result or {}
 
     _print_summary(results)

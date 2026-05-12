@@ -25,10 +25,17 @@ def _load_all_strategies():
     return list(STRATEGY_DIR.glob("*.yaml"))
 
 
-def _resolve_strategy_path(path):
-    """Return optimized version of a strategy if it exists, else original."""
-    opt_path = STRATEGY_DIR / "optimized" / f"{path.stem}_optimized.yaml"
-    return opt_path if opt_path.exists() else path
+def _resolve_strategy_path(path, ticker=None):
+    """Return optimized strategy, preferring ticker-specific over global over base."""
+    opt_dir = STRATEGY_DIR / "optimized"
+    if ticker:
+        ticker_opt = opt_dir / f"{path.stem}_{ticker}_optimized.yaml"
+        if ticker_opt.exists():
+            return ticker_opt
+    global_opt = opt_dir / f"{path.stem}_optimized.yaml"
+    if global_opt.exists():
+        return global_opt
+    return path
 
 
 def _print_signals(all_signals):
@@ -131,17 +138,17 @@ def alert(target, strategy, all_strategies, interval, webhook_url):
     all_signals = []
 
     for path in strategy_paths:
-        resolved = _resolve_strategy_path(path)
-        if resolved != path:
-            logger.info(f"[opt] Using optimized: {resolved.name}")
-
-        with open(resolved) as f:
-            strat = yaml.safe_load(f)
-
-        strat_name = strat.get("name", path.stem)
-        print(f"\nStrategy: {strat_name}  ({resolved.name})")
+        strat_name = yaml.safe_load(open(path)).get("name", path.stem)
+        print(f"\nStrategy: {strat_name}")
 
         for t in tickers:
+            resolved = _resolve_strategy_path(path, ticker=t)
+            if resolved != path:
+                logger.info(f"[opt] {t}: using {resolved.name}")
+
+            with open(resolved) as f:
+                strat = yaml.safe_load(f)
+
             signals = check_signals(t, interval, strat)
             if signals is None:
                 logger.warning(f"[!] Skipped {t} — no data")

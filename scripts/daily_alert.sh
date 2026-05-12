@@ -31,4 +31,11 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') — Starting daily alert scan" >> "$LOG"
     ${STONKS_DISCORD_WEBHOOK:+--webhook-url "$STONKS_DISCORD_WEBHOOK"} \
     >> "$LOG" 2>&1
 
+echo "$(date '+%Y-%m-%d %H:%M:%S') — Starting LEAP scan" >> "$LOG"
+
+"$VENV" leaps all \
+    --interval 1wk \
+    ${STONKS_DISCORD_WEBHOOK:+--webhook-url "$STONKS_DISCORD_WEBHOOK"} \
+    >> "$LOG" 2>&1
+
 echo "$(date '+%Y-%m-%d %H:%M:%S') — Done" >> "$LOG"
