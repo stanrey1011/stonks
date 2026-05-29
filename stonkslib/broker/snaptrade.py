@@ -46,8 +46,8 @@ def is_configured() -> bool:
 
 
 def is_registered() -> bool:
-    """True if a user credential file exists on disk (user has been registered)."""
-    return _USER_FILE.exists()
+    """True if user credentials are available (env vars or credential file)."""
+    return _load_user() is not None
 
 
 # ── signed request plumbing ─────────────────────────────────────────────────────
@@ -91,6 +91,11 @@ def _request(method: str, subpath: str, query: dict | None = None, body=None):
 # ── per-user credential persistence ─────────────────────────────────────────────
 
 def _load_user() -> dict | None:
+    # Env vars take precedence — lets credentials travel with .env across environments.
+    uid = os.getenv("SNAPTRADE_USER_ID", "")
+    secret = os.getenv("SNAPTRADE_USER_SECRET", "")
+    if uid and secret:
+        return {"userId": uid, "userSecret": secret}
     if not _USER_FILE.exists():
         return None
     try:
