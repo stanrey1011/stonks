@@ -45,6 +45,11 @@ def is_configured() -> bool:
     return bool(_CLIENT_ID and _CONSUMER_KEY)
 
 
+def is_registered() -> bool:
+    """True if a user credential file exists on disk (user has been registered)."""
+    return _USER_FILE.exists()
+
+
 # ── signed request plumbing ─────────────────────────────────────────────────────
 
 def _sign(subpath: str, query: str, body) -> str:

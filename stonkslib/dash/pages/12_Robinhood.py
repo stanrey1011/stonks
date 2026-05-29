@@ -12,7 +12,8 @@ st.set_page_config(page_title="Robinhood — Stonks", layout="wide")
 st.title("Robinhood")
 
 try:
-    from stonkslib.broker.robinhood import get_snapshot, is_configured, connect_url
+    from stonkslib.broker.robinhood import get_snapshot, connect_url
+    from stonkslib.broker.snaptrade import is_configured, is_registered, register_user
     _broker_available = True
 except ImportError:
     _broker_available = False
@@ -21,18 +22,33 @@ if not _broker_available:
     st.error("SnapTrade client unavailable — check the install.")
     st.stop()
 
+# ── Step 1: keys present? ──────────────────────────────────────────────────────
 if not is_configured():
     st.info(
-        "Robinhood is read through the **SnapTrade** aggregator (read-only). Add your "
-        "SnapTrade partner keys to `.env`, then restart:\n\n"
+        "Robinhood is read through the **SnapTrade** aggregator (read-only). "
+        "Add your SnapTrade partner keys to `.env`, then restart:\n\n"
         "```\nSNAPTRADE_CLIENT_ID=...\nSNAPTRADE_CONSUMER_KEY=...\n```"
     )
     st.stop()
 
+# ── Step 2: user registered? ───────────────────────────────────────────────────
+if not is_registered():
+    st.warning("SnapTrade user not registered yet — this is a one-time setup step.")
+    st.caption(
+        "Click below to create your SnapTrade user account. "
+        "Credentials are saved to `data/snaptrade_user.json` on the data volume."
+    )
+    if st.button("Register with SnapTrade", key="rh_register"):
+        with st.spinner("Registering…"):
+            try:
+                register_user()
+                st.success("Registered! Reload the page to continue.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Registration failed: {e}")
+    st.stop()
 
-# Single-pass fetch, cached ~10 min. SnapTrade only syncs Robinhood holdings about
-# once a day, so a short cache buys nothing; this keeps revisits instant. The
-# Refresh button clears the cache to force a refetch.
+# ── Step 3: account linked? ────────────────────────────────────────────────────
 @st.cache_data(ttl=600, show_spinner="Loading Robinhood positions… (first load only)")
 def _load_snapshot() -> dict:
     return get_snapshot()
@@ -41,7 +57,7 @@ def _load_snapshot() -> dict:
 snap = _load_snapshot()
 
 if not snap["connected"]:
-    st.warning("SnapTrade keys are set, but no Robinhood account is linked yet.")
+    st.warning("Registered with SnapTrade, but no Robinhood account is linked yet.")
     st.caption(
         "Generate a one-time SnapTrade Connection Portal link, open it, pick "
         "**Robinhood**, log in, and authorize read-only access — then hit Refresh."
