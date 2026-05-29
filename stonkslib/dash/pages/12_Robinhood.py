@@ -33,17 +33,19 @@ if not is_configured():
 
 # ── Step 2: user registered? ───────────────────────────────────────────────────
 if not is_registered():
-    st.warning("SnapTrade user not registered yet — this is a one-time setup step.")
-    st.caption(
-        "Click below to create your SnapTrade user account. "
-        "Credentials are saved to `data/snaptrade_user.json` on the data volume."
-    )
+    st.warning("SnapTrade user not registered yet — one-time setup.")
+    st.caption("Click below to create your SnapTrade user account.")
     if st.button("Register with SnapTrade", key="rh_register"):
         with st.spinner("Registering…"):
             try:
-                register_user()
-                st.success("Registered! Reload the page to continue.")
-                st.rerun()
+                user = register_user()
+                st.success("Registered! **Save these to your `.env`** so they survive a volume wipe:")
+                st.code(
+                    f"SNAPTRADE_USER_ID={user['userId']}\n"
+                    f"SNAPTRADE_USER_SECRET={user['userSecret']}",
+                    language="bash",
+                )
+                st.caption("Once saved to `.env`, restart the container and reload this page.")
             except Exception as e:
                 st.error(f"Registration failed: {e}")
     st.stop()
