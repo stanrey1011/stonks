@@ -65,19 +65,6 @@ def _check_ollama() -> tuple[bool, str]:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _check_discord() -> tuple[bool, str]:
-    webhook = os.getenv("STONKS_DISCORD_WEBHOOK", "")
-    token   = os.getenv("DISCORD_BOT_TOKEN", "")
-    if not webhook and not token:
-        return False, "STONKS_DISCORD_WEBHOOK and DISCORD_BOT_TOKEN not set"
-    if not webhook:
-        return True, "Bot token set (no webhook)"
-    if not token:
-        return True, "Webhook set (no bot token)"
-    return True, "Webhook + bot token set"
-
-
-@st.cache_data(ttl=300, show_spinner=False)
 def _check_yfinance() -> tuple[bool, str]:
     try:
         import yfinance as yf
@@ -162,7 +149,7 @@ def _status_badge(ok: bool, msg: str, label: str):
     )
 
 
-col_fh, col_yf, col_ol, col_dc, col_ap, col_al, col_rh = st.columns(7)
+col_fh, col_yf, col_ol, col_ap, col_al, col_rh = st.columns(6)
 
 with col_fh:
     ok, msg = _check_finnhub()
@@ -175,10 +162,6 @@ with col_yf:
 with col_ol:
     ok, msg = _check_ollama()
     _status_badge(ok, msg, "Ollama")
-
-with col_dc:
-    ok, msg = _check_discord()
-    _status_badge(ok, msg, "Discord")
 
 with col_ap:
     ok, msg = _check_alpaca_paper()

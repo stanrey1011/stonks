@@ -26,6 +26,7 @@ services:
     build: .
     image: stonks:latest
     container_name: stonks-scheduler
+    init: true
     env_file: .env
     environment:
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
