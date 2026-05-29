@@ -16,6 +16,7 @@ from stonkslib.cli.dash import dash
 from stonkslib.cli.leaps import leaps
 from stonkslib.cli.leaps_backtest import leaps_backtest
 from stonkslib.cli.leaps_trades import leaps_trades
+from stonkslib.cli.earnings_refresh import earnings_refresh
 
 
 @click.group()
@@ -38,6 +39,7 @@ cli.add_command(dash)
 cli.add_command(leaps)
 cli.add_command(leaps_backtest)
 cli.add_command(leaps_trades)
+cli.add_command(earnings_refresh)
 
 if __name__ == "__main__":
     cli(auto_envvar_prefix="STONKS", standalone_mode=True)

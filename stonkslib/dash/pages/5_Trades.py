@@ -9,6 +9,7 @@ from stonkslib.dash.common import load_watchlist, flat_tickers, BACKTEST_DIR
 
 st.set_page_config(page_title="Trades — Stonks", layout="wide")
 st.title("Trades")
+st.caption("Shows the individual entry and exit trades from a saved backtest — date, price, size, P&L, and the reason each trade fired. Use this to verify that the strategy is entering and exiting at sensible points, and cross-reference with the Chart page to see the trades visually.")
 
 wl = load_watchlist()
 tickers = flat_tickers(wl)
@@ -18,9 +19,9 @@ if not tickers:
 
 col1, col2 = st.columns([3, 1])
 with col1:
-    ticker = st.selectbox("Ticker", tickers)
+    ticker = st.selectbox("Ticker", tickers, key="trades_ticker")
 with col2:
-    interval = st.selectbox("Interval", ["1d", "1wk"])
+    interval = st.selectbox("Interval", ["1d", "1wk"], key="trades_interval")
 
 result_dir = BACKTEST_DIR / ticker / interval
 csvs = sorted(result_dir.glob("*.csv")) if result_dir.exists() else []
@@ -32,7 +33,11 @@ if not csvs:
 strategy_map = {c.stem.replace("_", " ").title(): c for c in csvs}
 strategy = st.selectbox("Strategy", list(strategy_map.keys()))
 
-df = pd.read_csv(strategy_map[strategy])
+try:
+    df = pd.read_csv(strategy_map[strategy])
+except pd.errors.EmptyDataError:
+    st.info("No trades recorded for this strategy — the backtest ran but had no entries.")
+    st.stop()
 if df.empty:
     st.info("No trades recorded for this strategy.")
     st.stop()

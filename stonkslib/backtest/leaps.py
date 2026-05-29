@@ -78,6 +78,9 @@ def run_leaps_backtest(ticker, interval, strategy, option_type="auto",
         logger.warning(f"[!] No data for {ticker} ({interval})")
         return None
 
+    _lookback = {"1wk": 260, "1d": 756, "1h": 504}.get(interval, 252)
+    df = df.iloc[-_lookback:]
+
     ind = strategy.get("indicators", {})
 
     # --- Build indicators ---

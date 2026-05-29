@@ -44,7 +44,6 @@ BASE_ANALYSIS_DIR = os.path.join(BASE_DIR, "..", "data", "analysis", "signals")
 def load_ticker_list(yaml_file=TICKER_YAML):
     with open(yaml_file, "r") as f:
         tickers = yaml.safe_load(f)
-        print("Tickers list:", tickers)
     result = []
     for category in tickers:
         items = tickers[category]
@@ -76,13 +75,11 @@ def aggregate_and_save(ticker, interval):
 
     # --- RSI ---
     try:
-        for p in [5, 7, 14]:
-            series = rsi(df.copy(), period=p)
-            rsi_df = pd.DataFrame({f"RSI_{p}": series})
-            save_csv(rsi_df, ticker, interval, f"rsi_{p}")
-            rsi_signals = generate_rsi_signals(series)
-            if not rsi_signals.empty:
-                save_csv(rsi_signals, ticker, interval, f"rsi_{p}_signals")
+        series = rsi(df.copy(), period=14)
+        save_csv(pd.DataFrame({"RSI_14": series}), ticker, interval, "rsi_14")
+        rsi_signals = generate_rsi_signals(series)
+        if not rsi_signals.empty:
+            save_csv(rsi_signals, ticker, interval, "rsi_14_signals")
         status["rsi"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] RSI error: {e}")
@@ -90,17 +87,11 @@ def aggregate_and_save(ticker, interval):
 
     # --- MACD ---
     try:
-        macd_df = pd.DataFrame(index=df.index)
-        all_signals = pd.DataFrame()
-        for fast, slow, sig in [(5, 13, 4), (6, 19, 3), (12, 26, 9)]:
-            out = macd(df.copy(), short_window=fast, long_window=slow, signal_window=sig)
-            macd_df[f"MACD_{fast}_{slow}_{sig}"] = out["MACD"]
-            sigs = generate_macd_signals(out)
-            if not sigs.empty:
-                all_signals = pd.concat([all_signals, sigs])
-        save_csv(macd_df, ticker, interval, "macd")
-        if not all_signals.empty:
-            save_csv(all_signals, ticker, interval, "macd_signals")
+        out = macd(df.copy(), short_window=12, long_window=26, signal_window=9)
+        save_csv(pd.DataFrame({"MACD_12_26_9": out["MACD"]}, index=df.index), ticker, interval, "macd")
+        sigs = generate_macd_signals(out)
+        if not sigs.empty:
+            save_csv(sigs, ticker, interval, "macd_signals")
         status["macd"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] MACD error: {e}")
@@ -108,18 +99,15 @@ def aggregate_and_save(ticker, interval):
 
     # --- Bollinger Bands ---
     try:
-        bb_df = pd.DataFrame(index=df.index)
-        signals_df = pd.DataFrame()
-        for win, std in [(10, 1.5), (20, 2), (30, 2.5)]:
-            bands = bollinger_bands(df.copy(), window=win, num_std_dev=std)
-            bb_df[f"BB_upper_{win}_{std}"] = bands["Upper_Band"]
-            bb_df[f"BB_lower_{win}_{std}"] = bands["Lower_Band"]
-            breakout_signals = generate_bollinger_signals(bands)
-            if not breakout_signals.empty:
-                signals_df = pd.concat([signals_df, breakout_signals], axis=0)
+        bands = bollinger_bands(df.copy(), window=20, num_std_dev=2)
+        bb_df = pd.DataFrame({
+            "BB_upper_20_2": bands["Upper_Band"],
+            "BB_lower_20_2": bands["Lower_Band"],
+        }, index=df.index)
         save_csv(bb_df, ticker, interval, "bollinger")
-        if not signals_df.empty:
-            save_csv(signals_df[["Close", "Signal"]], ticker, interval, "bollinger_signals")
+        sigs = generate_bollinger_signals(bands)
+        if not sigs.empty:
+            save_csv(sigs[["Close", "Signal"]], ticker, interval, "bollinger_signals")
         status["bollinger"] = "ok"
     except Exception as e:
         logging.error(f"[{ticker} {interval}] Bollinger error: {e}")

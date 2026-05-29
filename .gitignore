@@ -38,4 +38,13 @@ dist/
 *.zip
 *.bak
 *.tmp
+
+# Secrets / credentials
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pickle
+secrets.yaml
+credentials.json

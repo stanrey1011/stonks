@@ -61,6 +61,15 @@ def run_pipeline(ticker, interval, force=False):
     except Exception as e:
         logger.error(f"[!] Analyze {ticker} ({interval}): {e}")
 
+    # Earnings data — skip crypto, fetch once per ticker (not per interval)
+    if interval == "1d":
+        try:
+            from stonkslib.utils.earnings import fetch_and_save
+            fetch_and_save(ticker)
+            logger.info(f"[✓] Earnings saved {ticker}")
+        except Exception as e:
+            logger.warning(f"[!] Earnings {ticker}: {e}")
+
     return True
 
 

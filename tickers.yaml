@@ -4,8 +4,11 @@ crypto:
 etfs:
 - SPY
 - QQQ
-- EART
-- NUKZ
+- SCHD
+- VYM
+- VIG
+- JEPI
+- SPYD
 stocks:
 - AAPL
 - TSLA
@@ -27,13 +30,11 @@ stocks:
 - MP
 - AVGO
 - GLD
-- NFLX
 - XOM
-- WPM
-- ACHR
-- NEGG
-- RR
-- QBTS
-- PYPL
 - TMQ
-- UMAC
+- GOOGL
+- CRWV
+- NBIS
+- MARA
+- DVLT
+- DEFT

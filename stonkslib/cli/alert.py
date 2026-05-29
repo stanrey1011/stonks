@@ -54,11 +54,15 @@ def _print_signals(all_signals):
             for s in buys:
                 print(f"    {s['ticker']:<8} [{s['interval']}]  ${s['close']:.2f}  {s['date']}")
                 print(f"             Reason: {s['reason']}")
+                if s.get("llm_conviction"):
+                    print(f"             LLM: [{s['llm_conviction'].upper()}] {s['llm_reasoning']}")
         if sells:
             print(f"\n  SELL signals ({len(sells)}):")
             for s in sells:
                 print(f"    {s['ticker']:<8} [{s['interval']}]  ${s['close']:.2f}  {s['date']}")
                 print(f"             Reason: {s['reason']}")
+                if s.get("llm_conviction"):
+                    print(f"             LLM: [{s['llm_conviction'].upper()}] {s['llm_reasoning']}")
 
     print(f"\n{'='*65}\n")
 
@@ -71,15 +75,31 @@ def _send_discord(webhook_url, all_signals, interval):
     sells = [s for s in all_signals if s["type"] == "SELL"]
     lines = [f"**Stonks Alert** — `{interval}` daily scan"]
 
+    conviction_emoji = {"high": "🔥", "medium": "📊", "low": "⚠️", "none": ""}
+
     if buys:
         lines.append("\n**BUY signals**")
         for s in buys:
-            lines.append(f"> `{s['ticker']}` ${s['close']:.2f} — {s['reason']} _(via {s.get('strategy', '?')})_")
+            conv = s.get("llm_conviction", "")
+            emoji = conviction_emoji.get(conv, "")
+            line = f"> `{s['ticker']}` ${s['close']:.2f} — {s['reason']} _(via {s.get('strategy', '?')})_"
+            if emoji:
+                line += f" {emoji} {conv}"
+            lines.append(line)
+            if s.get("llm_reasoning"):
+                lines.append(f"> _{s['llm_reasoning']}_")
 
     if sells:
         lines.append("\n**SELL signals**")
         for s in sells:
-            lines.append(f"> `{s['ticker']}` ${s['close']:.2f} — {s['reason']} _(via {s.get('strategy', '?')})_")
+            conv = s.get("llm_conviction", "")
+            emoji = conviction_emoji.get(conv, "")
+            line = f"> `{s['ticker']}` ${s['close']:.2f} — {s['reason']} _(via {s.get('strategy', '?')})_"
+            if emoji:
+                line += f" {emoji} {conv}"
+            lines.append(line)
+            if s.get("llm_reasoning"):
+                lines.append(f"> _{s['llm_reasoning']}_")
 
     try:
         resp = requests.post(webhook_url, json={"content": "\n".join(lines)}, timeout=10)
@@ -103,7 +123,16 @@ def _send_discord(webhook_url, all_signals, interval):
               default="1d", show_default=True)
 @click.option("--webhook-url", "webhook_url", default=None, envvar="STONKS_DISCORD_WEBHOOK",
               help="Discord webhook URL (or set STONKS_DISCORD_WEBHOOK env var)")
-def alert(target, strategy, all_strategies, interval, webhook_url):
+@click.option("--min-signals", "min_signals", default=1, show_default=True,
+              help="Minimum indicators that must agree (BUY or SELL) before alerting")
+@click.option("--confirm-weekly", "confirm_weekly", is_flag=True,
+              help="For 1d alerts: require the weekly 20/50 EMA trend to align with signal direction")
+@click.option("--llm-interpret", "llm_interpret", is_flag=True,
+              help="Use LLM to assess conviction and add plain-English reasoning to each signal")
+@click.option("--llm-model", "llm_model", default="qwen2.5:7b", show_default=True,
+              help="Ollama model for signal interpretation")
+def alert(target, strategy, all_strategies, interval, webhook_url, min_signals, confirm_weekly,
+          llm_interpret, llm_model):
     """Scan latest bar for entry/exit signals. Auto-uses optimized strategies when available.
 
     TARGET can be a ticker (AAPL), a category (stocks/etfs/crypto), or 'all'.\n
@@ -149,7 +178,11 @@ def alert(target, strategy, all_strategies, interval, webhook_url):
             with open(resolved) as f:
                 strat = yaml.safe_load(f)
 
-            signals = check_signals(t, interval, strat)
+            signals = check_signals(t, interval, strat,
+                                   min_signals=min_signals,
+                                   confirm_weekly=confirm_weekly,
+                                   llm_interpret=llm_interpret,
+                                   llm_model=llm_model)
             if signals is None:
                 logger.warning(f"[!] Skipped {t} — no data")
                 continue

@@ -1,9 +1,9 @@
 """
 title: Stonks Watchlist & Signals
 author: stanrey1011
-description: Manage your stonks watchlist, scan for signals, run backtests, optimize strategies, view trade logs, and scan/backtest LEAP options. Shares tickers.yaml with the CLI and Discord bot.
+description: Comprehensive stock analysis tool. Ask "how is AMD looking?" to get price, RSI, 52W range, 200MA, signals, earnings trend, backtest summary, and latest news sentiment in one call. Also supports watchlist management, signal scans, backtests, strategy optimization, trade logs, LEAP options analysis, and news fetching.
 required_open_webui_version: 0.3.9
-version: 1.2.0
+version: 1.4.0
 licence: MIT
 """
 
@@ -335,6 +335,479 @@ class Tools:
         total_pnl = sells["pnl"].sum() if "pnl" in sells.columns else 0
         lines.append("-" * 60)
         lines.append(f"Total P&L: ${total_pnl:.2f}  |  {len(buys)} trades")
+        return "\n".join(lines)
+
+    # --- snapshot & summary tools ---
+
+    def get_ticker_summary(self, ticker: str, interval: str = "") -> str:
+        """
+        Get a comprehensive snapshot of a single ticker — use this to answer questions like
+        "how is AMD looking?", "is NVDA a buy right now?", or "what's going on with TSLA?"
+
+        Returns: current price and momentum, RSI, 52-week range position, distance from
+        200-day MA, current BUY/SELL signals across all strategies, upcoming earnings date
+        and EPS estimate, recent earnings beat/miss history, and best backtest result.
+
+        ticker: symbol like AMD, NVDA, AAPL, BTC-USD
+        interval: 1d (default) or 1wk
+        """
+        interval = interval or self.valves.default_interval
+        ticker   = ticker.upper()
+
+        import pandas as pd
+        from datetime import datetime, timezone, date as date_type
+        from pathlib import Path as _Path
+
+        clean_dir     = PROJECT_ROOT / "data" / "ticker_data" / "clean"
+        earnings_dir  = PROJECT_ROOT / "data" / "ticker_data" / "earnings"
+        backtest_dir  = PROJECT_ROOT / "data" / "backtest_results" / "strategy"
+
+        lines = [f"=== {ticker} snapshot ({interval}) ===", ""]
+
+        # ── price & technicals ────────────────────────────────────────────────
+        parquet = clean_dir / ticker / f"{interval}.parquet"
+        if not parquet.exists():
+            parquet = clean_dir / ticker / "1d.parquet"
+
+        if parquet.exists():
+            df = pd.read_parquet(parquet)
+            df.columns = df.columns.str.title()
+            df = df.sort_index()
+            close = df["Close"]
+            price = float(close.iloc[-1])
+
+            day_chg = (price - float(close.iloc[-2])) / float(close.iloc[-2]) * 100 if len(close) >= 2 else None
+            wk_chg  = (price - float(close.iloc[-6])) / float(close.iloc[-6]) * 100 if len(close) >= 6 else None
+
+            w52   = close.tail(252)
+            hi52  = float(w52.max())
+            lo52  = float(w52.min())
+            rng   = (price - lo52) / (hi52 - lo52) * 100 if hi52 != lo52 else 50.0
+            p_lo  = (price - lo52)  / lo52  * 100
+            p_hi  = (price - hi52)  / hi52  * 100
+
+            ma200     = float(close.tail(200).mean()) if len(close) >= 200 else None
+            pct_ma200 = (price - ma200) / ma200 * 100 if ma200 else None
+
+            # RSI(14)
+            delta = close.diff()
+            gain  = delta.clip(lower=0).rolling(14).mean()
+            loss  = (-delta.clip(upper=0)).rolling(14).mean()
+            last_loss = loss.iloc[-1]
+            rsi = round(100 - 100 / (1 + gain.iloc[-1] / last_loss), 1) if last_loss and last_loss != 0 else None
+
+            vol     = float(df["Volume"].iloc[-1])      if "Volume" in df.columns else None
+            avg_vol = float(df["Volume"].tail(20).mean()) if "Volume" in df.columns and len(df) >= 20 else None
+            vol_ratio = vol / avg_vol if vol and avg_vol else None
+
+            # price line
+            day_s = f"{'▲' if day_chg >= 0 else '▼'} {abs(day_chg):.2f}%" if day_chg is not None else "—"
+            wk_s  = f"{'▲' if wk_chg  >= 0 else '▼'} {abs(wk_chg ):.2f}% (5d)" if wk_chg  is not None else ""
+            vol_s = f"{vol/1e6:.1f}M ({vol_ratio:.1f}× avg)" if vol and vol_ratio else "—"
+            lines.append(f"Price:   ${price:,.2f}  {day_s}  {wk_s}")
+            lines.append(f"Volume:  {vol_s}")
+
+            # short interest
+            if not ticker.upper().endswith(("-USD", "-USDT")):
+                try:
+                    from stonkslib.utils.short_interest import get_short_interest
+                    si = get_short_interest(ticker)
+                    sp = si.get("short_pct")
+                    dc = si.get("days_to_cover")
+                    mc = si.get("mom_change")
+                    if sp is not None:
+                        si_note = " — HIGH (squeeze risk)" if sp >= 0.25 else \
+                                  " — elevated" if sp >= 0.15 else \
+                                  " — normal"
+                        mom_s = f"  MoM: {'▲' if mc >= 0 else '▼'}{abs(mc):.1f}%" if mc is not None else ""
+                        dc_s  = f"  |  {dc:.1f}d to cover" if dc is not None else ""
+                        lines.append(f"Short:   {sp*100:.1f}% of float{si_note}{dc_s}{mom_s}")
+                except Exception:
+                    pass
+            lines.append("")
+
+            # RSI
+            if rsi is not None:
+                rsi_note = " — OVERSOLD (potential BUY zone)" if rsi <= 30 else \
+                           " — OVERBOUGHT (extended)" if rsi >= 70 else \
+                           " — neutral"
+                lines.append(f"RSI(14): {rsi}{rsi_note}")
+
+            # 52W
+            rng_note = " — near 52W LOW (potential support/value)" if rng <= 20 else \
+                       " — near 52W HIGH (extended)" if rng >= 80 else \
+                       " — mid-range"
+            lines.append(f"52W Range: {rng:.0f}% of range  [Lo ${lo52:,.2f} (+{p_lo:.1f}%) … Hi ${hi52:,.2f} ({p_hi:.1f}%)]  {rng_note}")
+
+            # 200MA
+            if pct_ma200 is not None:
+                ma_note = " — above 200MA (bullish trend)" if pct_ma200 >= 0 else " — below 200MA (bearish trend)"
+                lines.append(f"vs 200MA: {'+' if pct_ma200 >= 0 else ''}{pct_ma200:.1f}%{ma_note}")
+            lines.append("")
+        else:
+            lines.append(f"No price data found for {ticker}. Run: stonks pipeline {ticker}")
+            lines.append("")
+
+        # ── signals ───────────────────────────────────────────────────────────
+        signals = []
+        try:
+            signals = self._run_signals([ticker], interval)
+            if signals:
+                buys  = [s for s in signals if s["type"] == "BUY"]
+                sells = [s for s in signals if s["type"] == "SELL"]
+                lines.append(f"SIGNALS ({interval}):")
+                for s in buys:
+                    lines.append(f"  ▲ BUY  — {s['reason']}  [{s['strategy']}]")
+                for s in sells:
+                    lines.append(f"  ▼ SELL — {s['reason']}  [{s['strategy']}]")
+                if not buys and not sells:
+                    lines.append("  No signals on the latest bar.")
+            else:
+                lines.append(f"SIGNALS ({interval}): No signals on the latest bar.")
+        except Exception as e:
+            lines.append(f"SIGNALS: error — {e}")
+
+        # squeeze flag: BUY signal + high short interest
+        if signals and not ticker.upper().endswith(("-USD", "-USDT")):
+            try:
+                from stonkslib.utils.short_interest import get_short_interest
+                si = get_short_interest(ticker)
+                sp = si.get("short_pct")
+                buys = [s for s in signals if s["type"] == "BUY"]
+                if buys and sp and sp >= 0.15:
+                    squeeze_level = "HIGH" if sp >= 0.25 else "MODERATE"
+                    lines.append(f"  ⚡ SQUEEZE SETUP ({squeeze_level}): BUY signal + {sp*100:.1f}% short float — shorts may be forced to cover if this moves up")
+            except Exception:
+                pass
+        lines.append("")
+
+        # ── earnings ──────────────────────────────────────────────────────────
+        earnings_path = earnings_dir / f"{ticker}.json"
+        if earnings_path.exists():
+            try:
+                import json as _json
+                with open(earnings_path) as f:
+                    raw = _json.load(f)
+
+                next_date = raw.get("next_date")
+                next_eps  = raw.get("next_eps_estimate")
+                history   = raw.get("history", [])
+
+                lines.append("EARNINGS:")
+                if next_date:
+                    try:
+                        nd   = date_type.fromisoformat(next_date[:10])
+                        days = (nd - date_type.today()).days
+                        days_s = f"{days} days" if days > 0 else "this week"
+                        eps_s  = f" — EPS estimate: ${next_eps:.2f}" if next_eps else ""
+                        lines.append(f"  Next: {nd.strftime('%b %-d, %Y')} ({days_s}){eps_s}")
+                    except Exception:
+                        lines.append(f"  Next: {next_date}")
+
+                if history:
+                    lines.append("  Recent quarters (date → reported vs estimate):")
+                    beats = 0
+                    for q in history[:5]:
+                        d   = q.get("date", "?")[:10]
+                        rep = q.get("reported_eps")
+                        est = q.get("eps_estimate")
+                        sur = q.get("surprise_pct")
+                        if rep is not None and est is not None:
+                            result = "Beat" if rep > est else "Miss"
+                            if result == "Beat": beats += 1
+                            sur_s = f"{sur:+.1f}%" if sur else ""
+                            lines.append(f"    {d}: ${rep:.2f} vs ${est:.2f} est → {result} {sur_s}")
+                        elif rep is not None:
+                            lines.append(f"    {d}: EPS ${rep:.2f}")
+                    total_with_est = sum(1 for q in history[:5] if q.get("reported_eps") is not None and q.get("eps_estimate") is not None)
+                    if total_with_est > 0:
+                        lines.append(f"  Beat rate: {beats}/{total_with_est} of last quarters with estimates")
+            except Exception as e:
+                lines.append(f"  Earnings data error: {e}")
+        else:
+            lines.append("EARNINGS: no cached data — run: stonks earnings-refresh")
+        lines.append("")
+
+        # ── best backtest ─────────────────────────────────────────────────────
+        # ── news & sentiment ──────────────────────────────────────────────────
+        try:
+            from stonkslib.utils.news import get_news as _get_news
+            news_data = _get_news(ticker, days=7)
+            articles  = news_data.get("articles", [])
+            sentiment = news_data.get("sentiment", {})
+
+            bull = sentiment.get("bullish_pct")
+            bear = sentiment.get("bearish_pct")
+            buzz = sentiment.get("buzz")
+
+            sent_parts = []
+            if bull is not None:
+                sent_parts.append(f"Bullish {bull*100:.0f}% / Bearish {bear*100:.0f}%")
+            if buzz is not None:
+                art_wk = sentiment.get("articles_week")
+                wk_avg = sentiment.get("weekly_average")
+                buzz_s = f"buzz {buzz:.2f}x"
+                if art_wk and wk_avg and wk_avg > 0:
+                    buzz_s += f" ({art_wk} articles vs {wk_avg:.0f} avg/wk)"
+                sent_parts.append(buzz_s)
+
+            if sent_parts or articles:
+                lines.append("NEWS (last 7 days):")
+                if sent_parts:
+                    lines.append(f"  Sentiment: {' | '.join(sent_parts)}")
+                for art in articles[:3]:
+                    date_s   = art.get("date", "")
+                    headline = art.get("headline", "")
+                    source   = art.get("source", "")
+                    lines.append(f"  [{date_s}] {headline}  -- {source}")
+                if len(articles) > 3:
+                    lines.append(f"  ... {len(articles) - 3} more articles (use get_news for full list)")
+                lines.append("")
+        except Exception as e:
+            lines.append(f"NEWS: error -- {e}")
+            lines.append("")
+
+        bt_dir = backtest_dir / ticker / interval
+        if bt_dir.exists():
+            jsons = sorted(bt_dir.glob("*.json"))
+            if jsons:
+                import json as _json
+                best = None
+                for j in jsons:
+                    try:
+                        with open(j) as f:
+                            m = _json.load(f)
+                        if best is None or m.get("net_pnl", 0) > best.get("net_pnl", 0):
+                            best = m
+                    except Exception:
+                        pass
+                if best:
+                    lines.append("BEST BACKTEST (historical):")
+                    lines.append(
+                        f"  {best.get('strategy','?')} — "
+                        f"P&L ${best.get('net_pnl',0):,.2f} | "
+                        f"Win rate {best.get('win_rate',0):.1%} | "
+                        f"{best.get('trades',0)} trades"
+                    )
+                    lines.append("")
+
+        return "\n".join(lines)
+
+    def get_watchlist_summary(self) -> str:
+        """
+        Get a one-line technical snapshot for every ticker in the watchlist.
+        Use this to compare tickers, find the most oversold, nearest to 52W lows,
+        or cross-reference signals — e.g. "which of my stocks are oversold with earnings soon?"
+        Returns price, day change, RSI, 52W position, signal, and next earnings for each ticker.
+        """
+        import pandas as pd
+        from datetime import date as date_type
+        import json as _json
+
+        clean_dir    = PROJECT_ROOT / "data" / "ticker_data" / "clean"
+        earnings_dir = PROJECT_ROOT / "data" / "ticker_data" / "earnings"
+
+        wl = self._load()
+        lines = ["Watchlist Summary:", ""]
+
+        for cat, tickers in wl.items():
+            if not tickers:
+                continue
+            lines.append(f"{cat.upper()}")
+            lines.append(f"  {'Ticker':<10} {'Price':>8}  {'Chg%':>6}  {'RSI':>4}  {'52W%':>5}  {'Signal':<10}  Earnings")
+            lines.append("  " + "-" * 72)
+
+            for ticker in tickers:
+                parquet = clean_dir / ticker / "1d.parquet"
+                if not parquet.exists():
+                    lines.append(f"  {ticker:<10} — no data")
+                    continue
+                try:
+                    df    = pd.read_parquet(parquet)
+                    df.columns = df.columns.str.title()
+                    df    = df.sort_index()
+                    close = df["Close"]
+                    price = float(close.iloc[-1])
+                    chg   = (price - float(close.iloc[-2])) / float(close.iloc[-2]) * 100 if len(close) >= 2 else None
+
+                    w52   = close.tail(252)
+                    hi52, lo52 = float(w52.max()), float(w52.min())
+                    rng   = (price - lo52) / (hi52 - lo52) * 100 if hi52 != lo52 else None
+
+                    delta = close.diff()
+                    gain  = delta.clip(lower=0).rolling(14).mean()
+                    loss  = (-delta.clip(upper=0)).rolling(14).mean()
+                    ll    = loss.iloc[-1]
+                    rsi   = round(100 - 100 / (1 + gain.iloc[-1] / ll), 0) if ll and ll != 0 else None
+                except Exception:
+                    lines.append(f"  {ticker:<10} — read error")
+                    continue
+
+                # signal from last alert cache
+                alert_cache = PROJECT_ROOT / "data" / "last_alert.json"
+                signal = "—"
+                if alert_cache.exists():
+                    try:
+                        with open(alert_cache) as f:
+                            ac = _json.load(f)
+                        sigs = ac.get("results", {}).get(ticker, {}).get("signals", [])
+                        types = {s["type"] for s in sigs}
+                        signal = "▲ BUY" if types == {"BUY"} else "▼ SELL" if types == {"SELL"} else "⚡ Mixed" if types else "—"
+                    except Exception:
+                        pass
+
+                # earnings
+                ep = earnings_dir / f"{ticker}.json"
+                earnings_s = "—"
+                if ep.exists():
+                    try:
+                        with open(ep) as f:
+                            er = _json.load(f)
+                        nd = er.get("next_date")
+                        if nd:
+                            d    = date_type.fromisoformat(nd[:10])
+                            days = (d - date_type.today()).days
+                            if days >= 0:
+                                earnings_s = f"{d.strftime('%b %-d')} ({days}d)"
+                    except Exception:
+                        pass
+
+                chg_s = f"{'▲' if chg >= 0 else '▼'}{abs(chg):.1f}%" if chg is not None else "  —  "
+                rsi_s = f"{rsi:.0f}" if rsi is not None else "—"
+                rng_s = f"{rng:.0f}%" if rng is not None else "—"
+                lines.append(
+                    f"  {ticker:<10} ${price:>7,.2f}  {chg_s:>6}  {rsi_s:>4}  {rng_s:>5}  {signal:<10}  {earnings_s}"
+                )
+            lines.append("")
+
+        return "\n".join(lines)
+
+    def get_last_alerts(self) -> str:
+        """
+        Return the results of the most recent alert scan without re-running it.
+        Shows which tickers had BUY or SELL signals and the reasons, along with
+        when the scan was run and which interval was used.
+        Much faster than scan_watchlist — use this when you just want to see what fired last time.
+        """
+        import json as _json
+        alert_cache = PROJECT_ROOT / "data" / "last_alert.json"
+        if not alert_cache.exists():
+            return "No cached alerts found. Run scan_watchlist or trigger an alert scan from the Alerts page."
+
+        try:
+            with open(alert_cache) as f:
+                data = _json.load(f)
+        except Exception as e:
+            return f"Could not read alert cache: {e}"
+
+        ts       = data.get("ts", "unknown time")
+        interval = data.get("interval", "?")
+        results  = data.get("results", {})
+
+        lines = [f"Last Alert Scan — {interval} — run at {ts}", ""]
+
+        buys = []
+        sells = []
+        mixed = []
+        for ticker, info in results.items():
+            sigs  = info.get("signals", [])
+            types = {s["type"] for s in sigs}
+            if types == {"BUY"}:
+                buys.append((ticker, sigs))
+            elif types == {"SELL"}:
+                sells.append((ticker, sigs))
+            elif types:
+                mixed.append((ticker, sigs))
+
+        if buys:
+            lines.append("▲ BUY SIGNALS:")
+            for ticker, sigs in buys:
+                reasons = " | ".join(f"{s['reason']} ({s.get('strategy','')})" for s in sigs)
+                lines.append(f"  {ticker}: {reasons}")
+            lines.append("")
+
+        if sells:
+            lines.append("▼ SELL SIGNALS:")
+            for ticker, sigs in sells:
+                reasons = " | ".join(f"{s['reason']} ({s.get('strategy','')})" for s in sigs)
+                lines.append(f"  {ticker}: {reasons}")
+            lines.append("")
+
+        if mixed:
+            lines.append("⚡ MIXED SIGNALS:")
+            for ticker, sigs in mixed:
+                buy_r  = [s['reason'] for s in sigs if s['type'] == 'BUY']
+                sell_r = [s['reason'] for s in sigs if s['type'] == 'SELL']
+                lines.append(f"  {ticker}: BUY({', '.join(buy_r)}) / SELL({', '.join(sell_r)})")
+            lines.append("")
+
+        if not buys and not sells and not mixed:
+            lines.append("No signals fired in the last scan.")
+
+        return "\n".join(lines)
+
+    def get_news(self, ticker: str, days: int = 7) -> str:
+        """
+        Get recent news headlines and sentiment for a ticker.
+        Use this when the user asks about news, what's in the press, or what's driving a stock.
+        ticker: symbol like AAPL or AMD
+        days: how many days back to fetch (default 7, max 30)
+        Returns sentiment (bullish%, bearish%, buzz ratio) and all recent headlines with summaries.
+        Requires FINNHUB_API_KEY in .env.
+        """
+        ticker = ticker.upper()
+        days   = max(1, min(days, 30))
+
+        try:
+            from stonkslib.utils.news import get_news as _get_news
+            data = _get_news(ticker, days=days)
+        except Exception as e:
+            return f"Error fetching news for {ticker}: {e}"
+
+        articles  = data.get("articles", [])
+        sentiment = data.get("sentiment", {})
+        fetched   = data.get("fetched_at", "")
+
+        lines = [f"=== {ticker} News (last {days} days) ===", ""]
+
+        bull = sentiment.get("bullish_pct")
+        bear = sentiment.get("bearish_pct")
+        buzz = sentiment.get("buzz")
+        art_wk = sentiment.get("articles_week")
+        wk_avg = sentiment.get("weekly_average")
+
+        if bull is not None or buzz is not None:
+            lines.append("SENTIMENT:")
+            if bull is not None:
+                tone = "Bullish" if bull > 0.55 else "Bearish" if bull < 0.45 else "Neutral"
+                lines.append(f"  {tone} — {bull*100:.0f}% bullish / {bear*100:.0f}% bearish")
+            if buzz is not None:
+                buzz_note = " (above average activity)" if buzz > 1.2 else \
+                            " (below average activity)" if buzz < 0.8 else " (normal activity)"
+                art_s = f" | {art_wk} articles this week vs {wk_avg:.0f} avg" if art_wk and wk_avg else ""
+                lines.append(f"  Buzz: {buzz:.2f}x{buzz_note}{art_s}")
+            lines.append("")
+
+        if not articles:
+            lines.append(f"No articles found for {ticker} in the last {days} days.")
+            return "\n".join(lines)
+
+        lines.append(f"HEADLINES ({len(articles)} articles):")
+        for art in articles:
+            date_s   = art.get("date", "")
+            headline = art.get("headline", "")
+            source   = art.get("source", "")
+            summary  = art.get("summary", "")
+            url      = art.get("url", "")
+            lines.append(f"\n  [{date_s}] {headline}")
+            lines.append(f"  Source: {source}")
+            if summary and summary != headline:
+                # truncate long summaries
+                s = summary[:300] + "..." if len(summary) > 300 else summary
+                lines.append(f"  {s}")
+            if url:
+                lines.append(f"  URL: {url}")
+
         return "\n".join(lines)
 
     # --- LEAP tools ---

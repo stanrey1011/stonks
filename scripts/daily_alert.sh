@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Daily alert scan — runs after market close, checks all tickers across all strategies
-# Schedule: crontab -e → 30 20 * * 1-5 /home/as/stonks/scripts/daily_alert.sh
-# (20:30 UTC = 4:30pm ET, weekdays only)
+# Scan signals and post to Discord before the trading day opens.
+# Runs at 13:00 UTC (3:00am HST / 9:00am ET) weekdays — 30 min before market open.
+# Crontab: 0 13 * * 1-5 /home/as/stonks/scripts/daily_alert.sh
 #
-# Set STONKS_DISCORD_WEBHOOK in your environment or .env file
+# Depends on daily_pipeline.sh having run after the previous close (20:30 UTC).
 
 set -euo pipefail
 
@@ -11,30 +11,26 @@ STONKS_DIR="/home/as/stonks"
 VENV="$STONKS_DIR/venv/bin/stonks"
 LOG="$STONKS_DIR/log/daily_alert.log"
 
-# Load webhook from .env if present
-ENV_FILE="$STONKS_DIR/.env"
-if [[ -f "$ENV_FILE" ]]; then
-    export $(grep -v '^#' "$ENV_FILE" | xargs)
+if [[ -f "$STONKS_DIR/.env" ]]; then
+    export $(grep -v '^#' "$STONKS_DIR/.env" | xargs)
 fi
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') — Starting daily alert scan" >> "$LOG"
+echo "$(date '+%Y-%m-%d %H:%M:%S') — Starting alert scan" >> "$LOG"
 
-# Fetch fresh data first, then scan
-"$VENV" fetch --all-tickers --interval 1d >> "$LOG" 2>&1
-"$VENV" clean --all-tickers --interval 1d >> "$LOG" 2>&1
-
-"$VENV" alert \
-    --all-strategies \
-    --all-tickers \
-    --interval 1d \
-    --use-optimized \
+# ── daily signals (confluence ≥2, weekly trend must agree) ───────────────────
+"$VENV" alert all --all-strategies --interval 1d \
+    --min-signals 2 --confirm-weekly \
     ${STONKS_DISCORD_WEBHOOK:+--webhook-url "$STONKS_DISCORD_WEBHOOK"} \
     >> "$LOG" 2>&1
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') — Starting LEAP scan" >> "$LOG"
+# ── weekly signals (confluence ≥2) ───────────────────────────────────────────
+"$VENV" alert all --all-strategies --interval 1wk \
+    --min-signals 2 \
+    ${STONKS_DISCORD_WEBHOOK:+--webhook-url "$STONKS_DISCORD_WEBHOOK"} \
+    >> "$LOG" 2>&1
 
-"$VENV" leaps all \
-    --interval 1wk \
+# ── LEAP scan ─────────────────────────────────────────────────────────────────
+"$VENV" leaps all --interval 1wk \
     ${STONKS_DISCORD_WEBHOOK:+--webhook-url "$STONKS_DISCORD_WEBHOOK"} \
     >> "$LOG" 2>&1
 

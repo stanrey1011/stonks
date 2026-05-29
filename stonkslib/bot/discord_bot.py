@@ -10,53 +10,53 @@ STRATEGY_DIR = PROJECT_ROOT / "stonkslib" / "strategies"
 
 VALID_INTERVALS = ["1d", "1wk", "1h", "1m", "5m", "15m", "30m"]
 
-HELP_TEXT = """**Stonks Bot — Commands**
+HELP_TEXT = """── Watchlist ──
+!tickers — show current watchlist
+!tickers add AMZN stocks — add a stock
+!tickers add SOL-USD crypto — add crypto
+!tickers add QQQ etfs — add an ETF
+(category required: stocks, crypto, etfs)
+!tickers remove TSLA — remove a ticker
 
-**── Watchlist ──**
-`!tickers` — show watchlist
-`!tickers add AMZN stocks` — add a stock (categories: stocks, etfs, crypto)
-`!tickers add SOL-USD crypto`
-`!tickers remove TSLA` — remove a ticker
+── Signals ──
+!alert — scan all tickers, all strategies (daily)
+!alert 1wk — weekly scan (better for long-term / LEAPS timing)
+!alert AAPL — scan a single ticker (daily)
+!alert AAPL 1wk — single ticker, weekly
 
-**── Signals ──**
-`!alert` — scan all tickers, all strategies (daily)
-`!alert 1wk` — weekly scan (recommended before buying LEAPs)
-`!alert AAPL` — single ticker daily scan
-`!alert AAPL 1wk` — single ticker weekly
+── LEAP Options ──
+!leaps — scan all tickers for LEAP opportunities (VIX rank + signals)
+!leaps etfs — ETFs only (VIX most accurate here)
+!leaps AAPL — single ticker LEAP scan
+!leaps 1wk — explicit weekly interval (default)
+!leaps-backtest NVDA — backtest all strategies, auto call/put per signal
+!leaps-backtest NVDA call — calls only
+!leaps-backtest NVDA 1wk put — weekly put backtest
+!leaps-trades NVDA call — entry/exit dates for best call strategy
+!leaps-trades NVDA call supertrend — specific strategy trade log
 
-**── LEAP Options ──**
-`!leaps` — scan all tickers for LEAP call/put opportunities (VIX + signals)
-`!leaps etfs` — ETFs only (VIX most accurate here)
-`!leaps AAPL` — single ticker LEAP scan
-`!leaps 1wk` — weekly interval (default)
-`!leaps-backtest AAPL` — backtest LEAP calls + puts on AAPL (weekly, auto)
-`!leaps-backtest AAPL call` — calls only
-`!leaps-backtest AAPL 1wk put` — weekly put backtest
-`!leaps-trades NVDA call` — show entry/exit dates for best call strategy on NVDA
-`!leaps-trades NVDA call supertrend` — specific strategy trade log
+── Backtesting ──
+!backtest AAPL — run all strategies on AAPL (daily)
+!backtest AAPL 1wk — weekly backtest (long-term view)
+!backtest — all strategies across all tickers (daily)
+!trades AAPL rsi — show buy/sell prices for a strategy (run backtest first)
+!trades AAPL 1wk rsi only — weekly trade log for a specific strategy
 
-**── Backtesting ──**
-`!backtest AAPL` — all strategies on AAPL (daily)
-`!backtest AAPL 1wk` — weekly backtest
-`!backtest` — all strategies, all tickers (daily)
-`!trades AAPL rsi` — trade log for a strategy (run backtest first)
-`!trades AAPL 1wk rsi only` — weekly trade log
+── Optimization ──
+!optimize AAPL — tune strategy params for one ticker, daily (LLM, 3 iterations)
+!optimize AAPL 1wk — tune on weekly bars (better for long-term strategies)
+!optimize AAPL leaps call — tune specifically for LEAP call entries on AAPL
+!optimize AAPL leaps put — tune for LEAP put / hedge entries
+!optimize — tune across all tickers — slow, run overnight
 
-**── Optimization ──**
-`!optimize AAPL` — tune strategy params for AAPL (equity, daily, 3 iters)
-`!optimize AAPL 1wk` — tune on weekly bars
-`!optimize AAPL leaps call` — tune specifically for LEAP call entries on AAPL
-`!optimize AAPL leaps put` — tune for LEAP put / hedge entries
-`!optimize` — tune across all tickers (slow, run overnight)
+── Workflows ──
+📈 New ticker: !tickers add AMD stocks → auto-fetched → !alert AMD to scan
+🔍 Daily check: !alert → fires automatically at 4:30pm ET on weekdays
+📅 LEAP research: !leaps 1wk → !leaps-backtest NVDA call → buy if confirmed
+⚙️ Tune for LEAPs: !optimize NVDA leaps call → wait → !leaps uses updated params
+🧹 Drop a ticker: !tickers remove TSLA → removed from all future scans
 
-**── Workflows ──**
-📈 **New ticker:** `!tickers add AMD stocks` → auto-fetched → `!alert AMD`
-🔍 **Daily routine:** `!alert` fires automatically at 4:30pm ET on weekdays
-📅 **LEAP research:** `!leaps 1wk` → `!leaps-backtest NVDA call` → buy if confirmed
-⚙️ **Tune for LEAPs:** `!optimize NVDA leaps call` → wait → `!leaps` uses updated params
-🧹 **Drop a ticker:** `!tickers remove TSLA`
-
-`!help` — show this message
+!help — show this message
 """
 
 
@@ -150,7 +150,8 @@ def run_bot(token):
 
         # ── !help ────────────────────────────────────────────────────────────
         if cmd == "!help":
-            await message.channel.send(HELP_TEXT)
+            for chunk in _send_chunks(HELP_TEXT.splitlines()):
+                await message.channel.send(chunk)
 
         # ── !tickers ─────────────────────────────────────────────────────────
         elif cmd == "!tickers":

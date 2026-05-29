@@ -1,0 +1,41 @@
+services:
+
+  stonks-dash:
+    build: .
+    container_name: stonks-dash
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  stonks-bot:
+    build: .
+    container_name: stonks-bot
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: python stonkslib/bot/discord_bot.py
+    restart: unless-stopped
+
+  stonks-scheduler:
+    build: .
+    container_name: stonks-scheduler
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: supercronic /app/docker/crontab
+    restart: unless-stopped

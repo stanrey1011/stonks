@@ -16,6 +16,29 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _weekly_trend(ticker: str) -> str:
+    """Determine weekly trend via 20/50 EMA crossover. Returns 'bullish', 'bearish', or 'neutral'."""
+    try:
+        data = load_td([ticker], "1wk")
+        df = data.get(ticker)
+        if df is None or df.empty or len(df) < 60:
+            return "neutral"
+        ma_out = moving_averages(df.tail(100).copy(), swing_window=20, long_window=50, ma_type="EMA")
+        swing = ma_out["MA_Swing"].iloc[-1]
+        long_ = ma_out["MA_Long"].iloc[-1]
+        if pd.isna(swing) or pd.isna(long_):
+            return "neutral"
+        diff_pct = (swing - long_) / long_
+        if diff_pct > 0.005:
+            return "bullish"
+        elif diff_pct < -0.005:
+            return "bearish"
+        return "neutral"
+    except Exception as e:
+        logger.warning(f"[{ticker}] weekly trend check failed: {e}")
+        return "neutral"
+
+
 def _ticker_category(ticker):
     """Return the category (stocks/crypto/etfs) for a ticker from tickers.yaml."""
     try:
@@ -29,8 +52,16 @@ def _ticker_category(ticker):
     return None
 
 
-def check_signals(ticker, interval, strategy):
-    """Check if the latest bar fires an entry or exit signal for a given strategy."""
+def check_signals(ticker, interval, strategy, min_signals: int = 1,
+                  confirm_weekly: bool = False, llm_interpret: bool = False,
+                  llm_model: str = "qwen2.5:7b"):
+    """Check if the latest bar fires an entry or exit signal for a given strategy.
+
+    min_signals:    require at least this many indicators to agree before returning a signal type.
+    confirm_weekly: for 1d intervals, require the weekly 20/50 EMA trend to align.
+    llm_interpret:  if True, passes fired signals + indicator context to an LLM for conviction
+                    scoring and plain-English reasoning, added to each signal dict.
+    """
     exclude = strategy.get("exclude_categories", [])
     if exclude:
         category = _ticker_category(ticker)
@@ -181,4 +212,91 @@ def check_signals(ticker, interval, strategy):
             rsi_val = div_series["RSI"].iloc[last_idx]
             signals.append(sig("SELL", f"Bearish RSI divergence (RSI={rsi_val:.1f})"))
 
-    return signals if signals else []
+    if not signals:
+        return []
+
+    # ── confluence gating ─────────────────────────────────────────────────────
+    if min_signals > 1:
+        buys  = [s for s in signals if s["type"] == "BUY"]
+        sells = [s for s in signals if s["type"] == "SELL"]
+        signals = []
+        if len(buys) >= min_signals:
+            signals.extend(buys)
+        if len(sells) >= min_signals:
+            signals.extend(sells)
+        if not signals:
+            logger.info(f"[{ticker}] filtered — confluence below {min_signals}")
+            return []
+
+    # ── weekly trend confirmation ─────────────────────────────────────────────
+    if confirm_weekly and interval == "1d":
+        trend = _weekly_trend(ticker)
+        if trend == "bullish":
+            signals = [s for s in signals if s["type"] == "BUY"]
+        elif trend == "bearish":
+            signals = [s for s in signals if s["type"] == "SELL"]
+        else:
+            logger.info(f"[{ticker}] filtered — weekly trend is neutral")
+            return []
+        for s in signals:
+            s["reason"] += f"  [weekly: {trend}]"
+        if not signals:
+            logger.info(f"[{ticker}] filtered — signal direction conflicts with weekly trend ({trend})")
+            return []
+
+    # ── LLM interpretation ────────────────────────────────────────────────────
+    if llm_interpret:
+        from stonkslib.llm.interpreter import interpret_signal
+
+        # build indicator context for the last 10 bars
+        n = 10
+        indicator_data = {
+            "dates": [str(d) for d in df.index[-n:]],
+            "close": df["Close"].iloc[-n:].tolist(),
+        }
+        if rsi_series is not None:
+            indicator_data["rsi"] = rsi_series.iloc[-n:].tolist()
+        if macd_series is not None:
+            indicator_data["macd"] = macd_series.iloc[-n:].tolist()
+        if bb_upper is not None and bb_lower is not None:
+            mid = (bb_upper + bb_lower) / 2
+            bb_width = bb_upper - bb_lower
+            indicator_data["bb_pct"] = [
+                round((c - m) / w * 100, 1) if w > 0 else 0
+                for c, m, w in zip(
+                    df["Close"].iloc[-n:],
+                    mid.iloc[-n:],
+                    bb_width.iloc[-n:],
+                )
+            ]
+        if ma_swing_series is not None and ma_long_series is not None:
+            indicator_data["ma_pos"] = [
+                "swing>long" if s > l else "swing<long"
+                for s, l in zip(
+                    ma_swing_series.iloc[-n:],
+                    ma_long_series.iloc[-n:],
+                )
+            ]
+        if st_series is not None:
+            indicator_data["st_dir"] = [
+                "bullish" if d == 1 else "bearish"
+                for d in st_series["Direction"].iloc[-n:]
+            ]
+
+        weekly_trend = _weekly_trend(ticker) if interval == "1d" else "n/a"
+        interp = interpret_signal(
+            ticker=ticker,
+            interval=interval,
+            signals=signals,
+            indicator_data=indicator_data,
+            weekly_trend=weekly_trend,
+            model=llm_model,
+        )
+        logger.info(
+            f"[{ticker}] LLM: {interp['conviction']} conviction — {interp['reasoning']}"
+        )
+        for s in signals:
+            s["llm_conviction"] = interp["conviction"]
+            s["llm_reasoning"]  = interp["reasoning"]
+
+    return signals

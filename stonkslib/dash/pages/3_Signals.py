@@ -10,6 +10,7 @@ from stonkslib.dash.common import load_watchlist, flat_tickers, STRATEGY_DIR
 
 st.set_page_config(page_title="Signals — Stonks", layout="wide")
 st.title("Signals")
+st.caption("Runs a live signal scan on the latest bar for any ticker and strategy. Shows BUY and SELL signals with the reason each fired. Optimized strategy params are used automatically when available. Use this to check a specific ticker on demand without waiting for the daily alert.")
 
 wl = load_watchlist()
 tickers = flat_tickers(wl)
@@ -19,9 +20,9 @@ if not tickers:
 
 col1, col2, col3 = st.columns([3, 1, 1])
 with col1:
-    target = st.selectbox("Ticker", ["All watchlist"] + tickers)
+    target = st.selectbox("Ticker", ["All watchlist"] + tickers, key="sig_target")
 with col2:
-    interval = st.selectbox("Interval", ["1d", "1wk"])
+    interval = st.selectbox("Interval", ["1d", "1wk"], key="sig_interval")
 with col3:
     st.write("")
     st.write("")

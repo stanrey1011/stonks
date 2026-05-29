@@ -40,6 +40,9 @@ Backtest results across {len(metrics_list)} ticker(s) ({metrics_list[0]["interva
 Average P&L: ${avg_pnl:.2f} | Average win rate: {avg_win:.1%}
 
 Suggest new parameter values to improve average P&L and win rate across all tickers.
+Prioritize signal quality over quantity — fewer high-conviction entries beat many weak ones.
+Raise thresholds (RSI levels, MACD sensitivity, BB periods) to reduce false signals and whipsaws.
+A strategy that fires 3-5 times per month with 65%+ win rate is better than one firing daily at 45%.
 Return ONLY this JSON structure (keep the same indicator names, only change numeric param values):
 {{
   "reasoning": "one sentence explaining the changes",
@@ -118,15 +121,14 @@ def _avg_leaps_score(metrics_list):
 
 
 def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_MODEL,
-             output_ticker=None, use_leaps=False, option_type="auto"):
+             output_ticker=None, use_leaps=False, option_type="auto", warm_start=False):
     """
     LLM-driven strategy parameter optimization.
 
-    Args:
-        use_leaps: if True, scores against the LEAP backtest (Black-Scholes pricing)
-                   and uses an options-aware LLM prompt. Output files get a
-                   _leaps_{option_type} suffix so they don't overwrite equity files.
-        option_type: "call", "put", or "auto" — passed to the LEAP backtest.
+    warm_start: if True and an optimized YAML already exists for this strategy/ticker,
+                start from those params instead of the base strategy. Use this for a
+                second-pass refinement (e.g. 7b exploration → 32b refinement).
+    use_leaps:  score against the LEAP backtest; output files get a _leaps_{option_type} suffix.
     """
     try:
         import ollama
@@ -135,7 +137,22 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
         return None
 
     strategy_path = Path(strategy_path)
-    strategy = load_strategy(strategy_path)
+
+    # Resolve warm-start: load from existing optimized YAML if available
+    parts = [strategy_path.stem]
+    if output_ticker:
+        parts.append(output_ticker)
+    if use_leaps:
+        parts.append(f"leaps_{option_type}")
+    existing_opt = OPTIMIZED_DIR / f"{'_'.join(parts)}_optimized.yaml"
+
+    if warm_start and existing_opt.exists():
+        strategy = load_strategy(existing_opt)
+        logger.info(f"[*] Warm start: loading from {existing_opt.name}")
+    else:
+        strategy = load_strategy(strategy_path)
+        if warm_start:
+            logger.info(f"[*] Warm start: no existing optimized YAML found, using base strategy")
 
     if isinstance(tickers, str):
         tickers = [tickers]

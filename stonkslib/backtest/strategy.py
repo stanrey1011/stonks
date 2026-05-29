@@ -36,24 +36,39 @@ def _ticker_category(ticker):
     return None
 
 
-def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
+def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_override=None,
+                          trailing_stop_pct=None, start_cash_override=None, risk_pct_override=None,
+                          per_signal_amount=0):
+    """
+    trailing_stop_pct: if set (e.g. 0.12 for 12%), disables indicator-based exits and
+                       instead exits when price drops more than X% from the post-entry peak.
+    per_signal_amount: if > 0, invest exactly this many dollars per buy signal instead of
+                       using risk_per_trade % of cash.
+    """
     exclude = strategy.get("exclude_categories", [])
     if exclude and _ticker_category(ticker) in exclude:
         logger.info(f"[skip] {ticker} excluded from '{strategy.get('name')}' (category filter)")
         return None
 
-    data = load_td([ticker], interval)
-    df = data.get(ticker)
-    if df is None or df.empty:
-        logger.warning(f"[!] No data for {ticker} ({interval})")
-        return None
+    if df_override is not None:
+        df = df_override.copy()
+    else:
+        data = load_td([ticker], interval)
+        df = data.get(ticker)
+        if df is None or df.empty:
+            logger.warning(f"[!] No data for {ticker} ({interval})")
+            return None
+        _lookback = {"1wk": 260, "1d": 756, "1h": 504}.get(interval, 252)
+        df = df.iloc[-_lookback:]
 
     ind = strategy.get("indicators", {})
     risk = strategy.get("risk", {})
-    cash = float(risk.get("start_cash", 10000))
-    risk_per_trade = float(risk.get("risk_per_trade", 0.2))
+    cash = float(start_cash_override if start_cash_override is not None else risk.get("start_cash", 10000))
+    actual_start = cash
+    total_signal_invested = 0.0
+    risk_per_trade = float(risk_pct_override if risk_pct_override is not None else risk.get("risk_per_trade", 0.2))
     stop_loss_pct = float(risk.get("stop_loss_pct", 0.1))
-    slippage = float(risk.get("slippage", 0.0005))  # 0.05% default
+    slippage = float(risk.get("slippage", 0.0005))
 
     # Compute enabled indicators
     rsi_series = None
@@ -108,41 +123,63 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
 
     pos = 0.0
     entry_price = None
+    peak_price = None   # for trailing stop
     trades = []
-    pending = None      # 'buy' or 'sell'
+    equity_curve = []   # (date, portfolio_value)
+    pending = None
     pending_reason = ""
 
     for idx, (i, row) in enumerate(df.iterrows()):
         open_price = row.get("Open")
         close = row.get("Close")
 
-        # --- Execute pending order at today's open (next bar after signal) ---
+        # --- Execute pending order at today's open ---
         if pending and open_price and not pd.isna(open_price):
             if pending == "buy" and pos == 0:
                 fill = open_price * (1 + slippage)
-                size = (cash * risk_per_trade) // fill
-                if size > 0:
+                if per_signal_amount > 0:
+                    amount = min(float(per_signal_amount), cash)
+                    size   = amount / fill
+                else:
+                    amount = cash * risk_per_trade
+                    size   = amount / fill
+                if size > 0.00001:
                     pos = size
                     entry_price = fill
-                    cash -= pos * fill
+                    peak_price = fill
+                    cash -= amount
+                    total_signal_invested += amount
                     trades.append({"action": "BUY", "date": str(i),
-                                   "price": round(fill, 4), "size": int(pos),
+                                   "price": round(fill, 4), "size": round(pos, 8),
                                    "cash": round(float(cash), 2), "reason": pending_reason})
             elif pending == "sell" and pos > 0:
                 fill = open_price * (1 - slippage)
                 cash += pos * fill
                 pnl = (fill - entry_price) * pos
                 trades.append({"action": "SELL", "date": str(i),
-                                "price": round(fill, 4), "size": int(pos),
+                                "price": round(fill, 4), "size": round(pos, 8),
                                 "cash": round(float(cash), 2),
                                 "pnl": round(float(pnl), 2), "reason": pending_reason})
                 pos = 0
                 entry_price = None
+                peak_price = None
             pending = None
             pending_reason = ""
 
         if close is None or pd.isna(close):
             continue
+
+        # --- Equity curve ---
+        portfolio_val = float(cash) + (pos * float(close) if pos > 0 else 0)
+        equity_curve.append({"date": str(i), "value": round(portfolio_val, 2)})
+
+        # --- Trailing stop ---
+        if trailing_stop_pct and pos > 0 and peak_price is not None and pending is None:
+            peak_price = max(peak_price, float(close))
+            if float(close) < peak_price * (1 - trailing_stop_pct):
+                pending = "sell"
+                pending_reason = f"Trailing Stop ({trailing_stop_pct:.0%} from ${peak_price:.2f})"
+                continue
 
         # --- Read indicator values for this bar ---
         r  = float(rsi_series.iloc[idx])      if rsi_series      is not None and idx < len(rsi_series)      else None
@@ -183,8 +220,8 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
                 if div_series["Bullish_Divergence"].iloc[idx]:
                     pending, pending_reason = "buy", "Bullish RSI divergence"
 
-        # --- Generate exit signal (fills at next bar's open) ---
-        elif pos > 0 and pending is None:
+        # --- Generate exit signal — skipped in trailing stop mode ---
+        elif pos > 0 and pending is None and not trailing_stop_pct:
             if r is not None and r > rsi_overbought:
                 pending, pending_reason = "sell", f"RSI>{rsi_overbought}"
             elif bu is not None and not pd.isna(bu) and close > bu:
@@ -211,7 +248,7 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
         cash += pos * fill
         pnl = (fill - entry_price) * pos
         trades.append({"action": "SELL_END", "date": str(df.index[-1]),
-                       "price": round(fill, 4), "size": int(pos),
+                       "price": round(fill, 4), "size": round(pos, 8),
                        "cash": round(float(cash), 2),
                        "pnl": round(float(pnl), 2), "reason": "End of Backtest"})
 
@@ -221,16 +258,33 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
     wins = len([t for t in trades if t.get("pnl", 0) > 0])
     win_rate = round(wins / num_trades, 3) if num_trades > 0 else 0.0
 
+    # max drawdown from equity curve
+    eq_vals = [e["value"] for e in equity_curve]
+    max_dd = 0.0
+    if eq_vals:
+        peak = eq_vals[0]
+        for v in eq_vals:
+            peak = max(peak, v)
+            dd = (peak - v) / peak if peak > 0 else 0
+            max_dd = max(max_dd, dd)
+
+    # total_invested: for per-signal mode = sum of $ actually deployed; else start_cash
+    total_invested = total_signal_invested if per_signal_amount > 0 else actual_start
     metrics = {
         "ticker": ticker,
         "interval": interval,
         "strategy": strategy.get("name", "unknown"),
         "final_cash": round(float(cash), 2),
-        "net_pnl": round(total_pnl, 2),
+        "net_pnl": round(float(cash) - actual_start, 2),
         "trades": num_trades,
         "win_rate": win_rate,
-        "start_cash": float(risk.get("start_cash", 10000)),
+        "max_drawdown": round(max_dd, 4),
+        "start_cash": actual_start,
+        "total_invested": round(total_invested, 2),
+        "per_signal_amount": per_signal_amount,
         "slippage_pct": slippage,
+        "exit_mode": f"trailing_{int(trailing_stop_pct*100)}pct" if trailing_stop_pct else "indicator",
+        "equity_curve": equity_curve,
     }
 
     strategy_slug = re.sub(r"[^a-z0-9]+", "_", strategy.get("name", "unknown").lower()).strip("_")
@@ -242,3 +296,71 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None):
 
     logger.info(f"[✓] {ticker} ({interval}) — P&L: ${total_pnl:.2f}, Trades: {num_trades}, Win rate: {win_rate:.1%}")
     return metrics
+
+
+def run_buy_and_hold(
+    df: pd.DataFrame,
+    start_cash: float = 10000,
+    slippage: float = 0.0005,
+    dca_amount: float = 0,
+    dca_bars: int = 0,
+) -> dict:
+    """
+    Benchmark: buy at the first bar's open with full capital, hold to the last bar.
+    If dca_amount > 0 and dca_bars > 0, add that amount every dca_bars bars and buy
+    immediately (simulates paycheck-style contributions).
+    """
+    df = df.copy()
+    cash = float(start_cash)
+    pos  = 0.0
+    total_invested  = float(start_cash)
+    n_contributions = 0
+    equity_curve    = []
+
+    for idx, (i, row) in enumerate(df.iterrows()):
+        open_price = row.get("Open")
+        close      = row.get("Close")
+
+        if dca_amount > 0 and dca_bars > 0 and idx > 0 and idx % dca_bars == 0:
+            if open_price and not pd.isna(open_price):
+                cash           += float(dca_amount)
+                total_invested += float(dca_amount)
+                n_contributions += 1
+
+        if open_price and not pd.isna(open_price) and cash > 0:
+            fill = float(open_price) * (1 + slippage)
+            pos  += cash / fill
+            cash  = 0.0
+
+        if close is None or pd.isna(close):
+            continue
+        equity_curve.append({"date": str(i), "value": round(pos * float(close), 2)})
+
+    final_value = 0.0
+    if pos > 0:
+        fill        = float(df["Close"].iloc[-1]) * (1 - slippage)
+        final_value = pos * fill
+
+    pnl   = final_value - total_invested
+    label = f"Buy & Hold + DCA (×{n_contributions})" if n_contributions > 0 else "Buy & Hold"
+
+    eq_vals = [e["value"] for e in equity_curve]
+    max_dd  = 0.0
+    if eq_vals:
+        peak = eq_vals[0]
+        for v in eq_vals:
+            peak   = max(peak, v)
+            dd     = (peak - v) / peak if peak > 0 else 0
+            max_dd = max(max_dd, dd)
+
+    return {
+        "strategy":       label,
+        "net_pnl":        round(pnl, 2),
+        "trades":         1 + n_contributions,
+        "win_rate":       1.0 if pnl > 0 else 0.0,
+        "max_drawdown":   round(max_dd, 4),
+        "start_cash":     start_cash,
+        "total_invested": round(total_invested, 2),
+        "final_cash":     round(final_value, 2),
+        "equity_curve":   equity_curve,
+    }

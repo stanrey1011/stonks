@@ -23,6 +23,30 @@ A local-first quantitative trading toolkit for stocks, ETFs, and crypto. Fetches
 
 ---
 
+## Daily Use
+
+```sh
+# Check signals right now
+cd /home/as/stonks && source venv/bin/activate
+stonks alert all --all-strategies       # uses optimized YAMLs automatically
+
+# Full pipeline for everything
+stonks pipeline                          # 1d
+stonks pipeline all --interval 1wk
+
+# Add / remove a ticker
+stonks tickers add AMD stocks
+stonks tickers add SOL-USD crypto
+stonks tickers remove TSLA
+
+# Data freshness + what's optimized
+stonks status
+```
+
+> **Tip:** `stonks fetch AAPL` without `stonks tickers add` is useful for quick one-off backtesting without polluting the watchlist.
+
+---
+
 ## Quick Start
 
 ```sh
@@ -126,6 +150,11 @@ stonks optimize --all-strategies --per-ticker --leaps --option-type put --all-ti
 
 Uses local Ollama to iteratively tune strategy parameters. Requires `ollama serve`. Default model: `qwen2.5:7b`. Use `--model qwen2.5:32b` for better results (slower).
 
+**Ollama models available on `anton`:**
+- `qwen2.5:0.5b`, `qwen2.5:7b`, `qwen2.5:32b`
+- `llama3.3:70b`
+- `glm-4.7-flash`
+
 ### Alert
 
 ```sh
@@ -176,19 +205,27 @@ stonks bot
 |---|---|
 | `!help` | Show all commands |
 | `!tickers` | Show watchlist |
-| `!tickers add AMZN` | Add stock to watchlist + run pipeline |
+| `!tickers add AMZN stocks` | Add stock to watchlist + run pipeline |
 | `!tickers add SOL-USD crypto` | Add crypto |
 | `!tickers remove TSLA` | Remove from watchlist |
-| `!alert` | Scan all tickers now |
-| `!alert AAPL 1wk` | Scan single ticker, weekly interval |
+| `!alert` | Scan all tickers, all strategies (daily) |
+| `!alert 1wk` | Weekly scan — recommended before buying LEAPs |
+| `!alert AAPL 1wk` | Single ticker weekly scan |
 | `!backtest AAPL` | Backtest all strategies for a ticker |
 | `!backtest AAPL 1wk` | Weekly backtest |
+| `!trades AAPL rsi` | Equity trade log for a strategy |
 | `!optimize AAPL` | Per-ticker optimize all strategies |
-| `!optimize AAPL leaps call` | LEAP-specific optimization |
-| `!leaps` | Scan watchlist for LEAP opportunities |
-| `!leaps-backtest NVDA call` | Run LEAP backtest |
-| `!leaps-backtest NVDA put 1d` | Daily interval put backtest |
-| `!leaps-trades NVDA` | Show LEAP entry/exit dates |
+| `!optimize AAPL 1wk` | Optimize on weekly bars |
+| `!optimize AAPL leaps call` | LEAP call optimization (scores by avg trade %) |
+| `!optimize AAPL leaps put` | LEAP put optimization |
+| `!leaps` | Scan all tickers for LEAP opportunities (VIX + signals) |
+| `!leaps etfs` | ETFs only (VIX most accurate here) |
+| `!leaps AAPL` | Single ticker LEAP scan |
+| `!leaps-backtest NVDA` | LEAP backtest — auto call/put per signal direction |
+| `!leaps-backtest NVDA call` | Calls only |
+| `!leaps-backtest NVDA 1wk put` | Weekly put backtest |
+| `!leaps-trades NVDA call` | Entry/exit dates for best call strategy |
+| `!leaps-trades NVDA call supertrend` | Specific strategy trade log |
 
 ---
 
@@ -248,6 +285,10 @@ Defined in `stonkslib/strategies/*.yaml`. Edit params directly or run `stonks op
 | Supertrend | `supertrend.yaml` | ATR-based; **excludes crypto** |
 | RSI Divergence | `rsi_divergence.yaml` | Price/RSI disagreement signals |
 
+**ThinkOrSwim reference params (from backtests):**
+- RSI Only: Period 14, Oversold 30, Overbought 70, Daily
+- RSI + MACD: RSI Period 7, Oversold 30, Overbought 78 / MACD 10-26-9, Stop 12%
+
 Optimized YAMLs are saved to `stonkslib/strategies/optimized/`. The lookup priority is:
 1. `{name}_{ticker}_leaps_{type}_optimized.yaml` — LEAP-specific per-ticker
 2. `{name}_{ticker}_optimized.yaml` — per-ticker
@@ -303,6 +344,15 @@ stonks/
 ├── .env                # Discord webhook + bot token (gitignored)
 └── requirements.txt
 ```
+
+---
+
+## Roadmap
+
+- [ ] News + sentiment layer in alerts
+- [ ] Interactive Brokers paper trading via `ib_insync`
+- [x] LEAP options backtesting (Black-Scholes; ThetaData not used)
+- [x] Open WebUI / LLM chat integration (`owui_tool.py`)
 
 ---
 

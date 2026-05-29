@@ -1,0 +1,17 @@
+# Stonks scheduled jobs — runs inside the stonks-scheduler container via supercronic
+# All times UTC. Mirrors the systemd timers on Anton.
+
+# Pipeline: fetch → clean → analyze all tickers (Mon-Fri 20:00 UTC / 4pm ET)
+0 20 * * 1-5 stonks pipeline all --interval 1d >> /app/log/pipeline.log 2>&1 && stonks pipeline all --interval 1wk >> /app/log/pipeline.log 2>&1
+
+# Alert scan: signals + LEAPs → Discord (Mon-Fri 20:30 UTC, after pipeline)
+30 20 * * 1-5 stonks alert all --all-strategies --interval 1d --min-signals 2 --confirm-weekly >> /app/log/alert.log 2>&1 && stonks alert all --all-strategies --interval 1wk --min-signals 2 >> /app/log/alert.log 2>&1 && stonks leaps all --interval 1wk >> /app/log/alert.log 2>&1
+
+# Optimization phase 1 — 7b exploration (Mon-Fri 10:00 UTC / midnight HST)
+0 10 * * 1-5 stonks optimize --all-strategies --all-tickers --interval 1d --iterations 3 --model qwen2.5:7b >> /app/log/optimize.log 2>&1 && stonks optimize --all-strategies --all-tickers --interval 1wk --iterations 3 --model qwen2.5:7b >> /app/log/optimize.log 2>&1
+
+# Optimization phase 2 — 32b refinement, warm-start from phase 1 (Mon-Fri 11:00 UTC)
+0 11 * * 1-5 stonks optimize --all-strategies --all-tickers --interval 1d --iterations 3 --model qwen2.5:32b --warm-start >> /app/log/optimize.log 2>&1 && stonks optimize --all-strategies --all-tickers --interval 1wk --iterations 3 --model qwen2.5:32b --warm-start >> /app/log/optimize.log 2>&1
+
+# Earnings cache refresh (Sat-Sun 12:00 UTC)
+0 12 * * 6,0 stonks earnings-refresh >> /app/log/earnings.log 2>&1

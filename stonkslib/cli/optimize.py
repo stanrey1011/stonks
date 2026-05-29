@@ -71,7 +71,10 @@ def _print_summary(results):
 @click.option("--option-type", "option_type",
               type=click.Choice(["call", "put", "auto"]), default="auto", show_default=True,
               help="Option direction for LEAP optimization (only used with --leaps)")
-def optimize(strategy, all_strategies, ticker, all_tickers, per_ticker, interval, iterations, model, use_leaps, option_type):
+@click.option("--warm-start", "warm_start", is_flag=True,
+              help="Start from an existing optimized YAML if one exists, instead of the base strategy. "
+                   "Use for a second-pass refinement with a stronger model.")
+def optimize(strategy, all_strategies, ticker, all_tickers, per_ticker, interval, iterations, model, use_leaps, option_type, warm_start):
     """LLM-driven parameter optimization across strategies and tickers.
 
     Use --per-ticker to save a separate optimized YAML per ticker.
@@ -124,6 +127,7 @@ def optimize(strategy, all_strategies, ticker, all_tickers, per_ticker, interval
                     output_ticker=t,
                     use_leaps=use_leaps,
                     option_type=option_type,
+                    warm_start=warm_start,
                 )
                 results[f"{name} / {t}"] = result or {}
         else:
@@ -138,6 +142,7 @@ def optimize(strategy, all_strategies, ticker, all_tickers, per_ticker, interval
                 model=model,
                 use_leaps=use_leaps,
                 option_type=option_type,
+                warm_start=warm_start,
             )
             results[name] = result or {}
 

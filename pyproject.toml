@@ -5,18 +5,28 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stonks"
 version = "0.1.1"
-description = "CLI tool for stock pattern detection"
-authors = [{ name = "Your Name", email = "your@email.com" }]
+description = "Local-first quantitative trading toolkit"
+authors = [{ name = "stanrey1011", email = "tech@stanrey.com" }]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.13"
 license = "MIT"
-keywords = ["stocks", "trading", "chart patterns", "cli"]
+keywords = ["stocks", "trading", "options", "leaps", "cli"]
 dependencies = [
     "click",
     "pandas",
+    "numpy",
     "yfinance",
-    "scikit-learn",
-    "pyyaml"
+    "pyyaml",
+    "plotly",
+    "pyarrow",
+    "pydantic",
+    "requests",
+    "scipy",
+    "streamlit",
+    "ollama",
+    "discord.py>=2.3.0",
+    "alpaca-py",
+    "python-dotenv",
 ]
 
 [project.scripts]

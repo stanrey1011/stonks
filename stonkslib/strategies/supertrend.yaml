@@ -2,6 +2,7 @@ name: "Supertrend"
 description: "Buy when Supertrend flips bullish, sell when it flips bearish. Clean trend-following for swing and long-term trades."
 exclude_categories:
   - crypto
+  - etfs
 indicators:
   supertrend:
     enabled: true
