@@ -1,30 +1,44 @@
-FROM python:3.13-slim
-
+# ── builder ──────────────────────────────────────────────────────────────────
+FROM python:3.13-slim AS builder
 WORKDIR /app
 
-# Build deps for scipy/numpy C extensions (wheels cover most cases but keep gcc as fallback)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        gcc g++ curl \
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install supercronic (Docker-native cron — no syslog daemon needed)
+COPY requirements.txt .
+# Strip the local editable self-install line (-e ...) — handled in runtime stage.
+RUN grep -v '^\s*-e\s' requirements.txt > /tmp/req.txt \
+    && pip install --no-cache-dir --prefix=/install -r /tmp/req.txt
+
+# ── runtime ───────────────────────────────────────────────────────────────────
+FROM python:3.13-slim
+WORKDIR /app
+
+# curl for the Streamlit healthcheck; no compilers needed at runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 ARG SUPERCRONIC_VERSION=0.2.33
 RUN curl -fsSL \
     "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
     -o /usr/local/bin/supercronic \
     && chmod +x /usr/local/bin/supercronic
 
-# Install Python deps before copying code (layer cache).
-# Strip the local editable self-install line (-e /home/as/...) — handled below.
-COPY requirements.txt .
-RUN grep -v '^\s*-e\s' requirements.txt > /tmp/req.txt && pip install --no-cache-dir -r /tmp/req.txt
+# Copy pre-built wheels from builder.
+COPY --from=builder /install /usr/local
 
-# Install the package in editable mode so 'stonks' CLI is available.
-# The actual source is volume-mounted at runtime; this just wires up the entry point.
-COPY pyproject.toml .
+# Copy application source.
+COPY pyproject.toml tickers.yaml config.yaml ./
 COPY stonkslib/ stonkslib/
-COPY tickers.yaml config.yaml ./
-RUN pip install --no-cache-dir -e .
+COPY docker/ docker/
+
+# Install the package entry point (stonks CLI). No compilers needed — wheels already installed.
+RUN pip install --no-cache-dir -e . \
+    && mkdir -p /app/data /app/log \
+    && useradd -u 1000 -m stonks \
+    && chown -R stonks:stonks /app
+
+USER stonks
 
 EXPOSE 8501
 
