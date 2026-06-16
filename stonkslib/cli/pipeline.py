@@ -21,8 +21,14 @@ def _resolve_tickers(target):
     return [target.upper()]
 
 
-def run_pipeline(ticker, interval, force=False):
-    """Run fetch → clean → analyze for a single ticker/interval."""
+def run_pipeline(ticker, interval, force=False, analyze=True):
+    """Run fetch → clean for a single ticker/interval.
+
+    When analyze=True (default) also runs indicator/pattern analysis, signal merge,
+    and the earnings fetch. analyze=False stops at the cleaned parquet — fast, for
+    just getting price data in; the scheduled pipeline (or the Pipeline page) fills
+    in analysis later. Only the Confluence page depends on the analysis output.
+    """
     import yaml as _yaml
     import os
     from pathlib import Path as _Path
@@ -53,6 +59,10 @@ def run_pipeline(ticker, interval, force=False):
     except Exception as e:
         logger.error(f"[!] Clean {ticker} ({interval}): {e}")
 
+    if not analyze:
+        logger.info(f"[✓] {ticker} ({interval}) — stopped at parquet (--no-analyze)")
+        return True
+
     try:
         aggregate_and_save(ticker, interval)
         merge_signals_for_ticker_interval(ticker, interval)
@@ -78,13 +88,18 @@ def run_pipeline(ticker, interval, force=False):
                 metavar="[TICKER|CATEGORY|all]")
 @click.option("--interval", type=click.Choice(INTERVALS), default="1d", show_default=True)
 @click.option("--force", is_flag=True, help="Force re-fetch even if data is fresh")
-def pipeline(target, interval, force):
-    """Run the full pipeline: fetch → clean → analyze.
+@click.option("--no-analyze", "no_analyze", is_flag=True,
+              help="Stop after the cleaned parquet — skip indicator/pattern analysis, "
+                   "merge, and earnings (fast). The scheduled pipeline / Pipeline page fills "
+                   "analysis in later; only the Confluence page needs it.")
+def pipeline(target, interval, force, no_analyze):
+    """Run the pipeline: fetch → clean → analyze (use --no-analyze to stop at the parquet).
 
     TARGET can be a ticker (AAPL), a category (stocks/etfs/crypto), or 'all'.\n
 
     Examples:\n
       stonks pipeline AAPL\n
+      stonks pipeline AMD --no-analyze        # just fetch + clean (fast)\n
       stonks pipeline crypto --interval 1wk\n
       stonks pipeline all --interval 1d --force
     """
@@ -96,10 +111,11 @@ def pipeline(target, interval, force):
         print(f"[!] No tickers found for: {target}")
         return
 
-    print(f"[→] Pipeline: {len(tickers)} ticker(s), interval={interval}")
+    mode = "fetch+clean only" if no_analyze else "full"
+    print(f"[→] Pipeline ({mode}): {len(tickers)} ticker(s), interval={interval}")
     ok = 0
     for t in tickers:
-        if run_pipeline(t, interval, force=force):
+        if run_pipeline(t, interval, force=force, analyze=not no_analyze):
             ok += 1
 
     print(f"[✓] Done — {ok}/{len(tickers)} ticker(s) completed ({interval})")

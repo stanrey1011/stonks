@@ -416,9 +416,12 @@ if add:
         else:
             wl2[new_cat].append(new_ticker)
             save_watchlist(wl2)
-            with st.status(f"Running pipeline for {new_ticker}...", expanded=True) as s:
+            with st.status(f"Fetching data for {new_ticker}...", expanded=True) as s:
+                # --no-analyze: stop at the cleaned parquet (fast). Indicator/pattern
+                # analysis (only the Confluence page needs it) runs in the nightly
+                # pipeline, or on demand from the Pipeline page.
                 proc = subprocess.Popen(
-                    [str(STONKS_BIN), "pipeline", new_ticker],
+                    [str(STONKS_BIN), "pipeline", new_ticker, "--no-analyze"],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     text=True, bufsize=1,
                 )
@@ -431,9 +434,10 @@ if add:
                         log.code("\n".join(lines[-20:]), language="text")
                 proc.wait()
                 if proc.returncode == 0:
-                    s.update(label=f"✓ {new_ticker} pipeline complete", state="complete", expanded=False)
-                    st.success(f"Added **{new_ticker}** to {new_cat}.")
+                    s.update(label=f"✓ {new_ticker} data fetched", state="complete", expanded=False)
+                    st.success(f"Added **{new_ticker}** to {new_cat}. "
+                               f"(Confluence analysis runs in the nightly pipeline or via the Pipeline page.)")
                 else:
-                    s.update(label=f"✗ Pipeline failed for {new_ticker}", state="error")
+                    s.update(label=f"✗ Fetch failed for {new_ticker}", state="error")
             st.cache_data.clear()
             st.rerun()
