@@ -118,14 +118,16 @@ stonks tickers list
 stonks tickers announce       # post full watchlist to Discord
 ```
 
-### 2. Configure Discord (optional)
+### 2. Configure Discord webhook (optional)
 
-Create a `.env` file in the project root:
+Set in `.env` to post watchlist/pipeline/optimize updates to a channel (omit to disable):
 
 ```sh
 STONKS_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
-DISCORD_BOT_TOKEN=your.bot.token.here
 ```
+
+> The standalone Discord bot is disabled (commented `stonks-bot` service in
+> `docker-compose.yml`); only the webhook above is wired up.
 
 ---
 
@@ -224,7 +226,15 @@ Shows watchlist, data freshness per ticker/interval, and which strategies have b
 
 ## Notifications
 
-Discord bot and webhook alerts are removed. Alert scans print to stdout and log files. **Matrix integration is planned** — a self-hosted Matrix server will replace Discord for push alerts.
+By default, alert scans print to stdout and log files only.
+
+**Discord webhook (optional):** set `STONKS_DISCORD_WEBHOOK` in `.env` to post watchlist
+changes (`stonks tickers add/remove/announce`), pipeline results (dashboard Pipeline page),
+and the nightly optimize summary to a Discord channel. Leave it unset to disable.
+
+**Discord bot (disabled):** the standalone bot is not shipped — its `stonks-bot` service is
+left commented in `docker-compose.yml` so it can be re-enabled or replaced. **Matrix/ntfy
+push alerts are planned** to augment or replace the webhook.
 
 ---
 

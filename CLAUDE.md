@@ -188,7 +188,17 @@ Key dashboard patterns:
 
 ### Notifications
 
-Discord bot and webhook alerts removed. Alert output goes to stdout/log only. Matrix integration is planned (Phase B — `stonkslib/notify/` module).
+Two Discord paths exist, both optional:
+- **Webhook posting (supported, dormant by default):** `stonks tickers add/remove/announce`
+  (`cli/tickers.py`), the Pipeline dashboard page (`dash/pages/7_Pipeline.py`), and
+  `scripts/nightly_optimize.sh` post to `STONKS_DISCORD_WEBHOOK` **only when that env var is
+  set**. Unset → output goes to stdout/log only.
+- **Discord bot (disabled):** the long-running bot source was removed; the `stonks-bot`
+  service is left commented in `docker-compose.yml` so it can be re-enabled or swapped for a
+  Matrix/ntfy backend. There is no `stonks bot` CLI command and `discord.py` is not a dep.
+
+Matrix/ntfy push alerts are planned (Phase B — `stonkslib/notify/` module) to augment or
+replace the webhook.
 
 ### Config files
 
