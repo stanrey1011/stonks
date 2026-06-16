@@ -8,6 +8,15 @@ project:
   log_dir: "log"
   strategy_dir: "stonkslib/strategies"
 
+# Curated set of strategies used by default for routine fan-outs (alert scans,
+# backtest/optimize sweeps, dashboard renders). Keep this small (3-4) to cap
+# processing cost as the strategy library grows. CLI `--every-strategy` overrides
+# it for a full sweep. Names are YAML stems under stonkslib/strategies/.
+active_strategies:
+  - rsi_macd
+  - supertrend
+  - bollinger
+
 strategies:
   leaps:
     min_dte: 270

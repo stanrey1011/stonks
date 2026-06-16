@@ -15,8 +15,7 @@ def _load_all_tickers():
     return [t for category in data.values() for t in category]
 
 
-def _load_all_strategies():
-    return [p for p in STRATEGY_DIR.glob("*.yaml")]
+from stonkslib.utils.active_strategies import resolve_strategy_set
 
 
 def _print_summary(results):
@@ -50,7 +49,9 @@ def _print_summary(results):
 @click.option("--strategy", default=None,
               help="Strategy YAML filename (e.g. rsi_macd.yaml). Omit for --all-strategies.")
 @click.option("--all-strategies", "all_strategies", is_flag=True,
-              help="Run optimization on all strategy YAMLs in stonkslib/strategies/")
+              help="Optimize the curated active strategy set (config.yaml: active_strategies)")
+@click.option("--every-strategy", "every_strategy", is_flag=True,
+              help="Optimize EVERY strategy YAML (full sweep; implies --all-strategies)")
 @click.option("--ticker", default=None,
               help="Single ticker to optimize against (e.g. AAPL).")
 @click.option("--all-tickers", "all_tickers", is_flag=True,
@@ -74,7 +75,7 @@ def _print_summary(results):
 @click.option("--warm-start", "warm_start", is_flag=True,
               help="Start from an existing optimized YAML if one exists, instead of the base strategy. "
                    "Use for a second-pass refinement with a stronger model.")
-def optimize(strategy, all_strategies, ticker, all_tickers, per_ticker, interval, iterations, model, use_leaps, option_type, warm_start):
+def optimize(strategy, all_strategies, every_strategy, ticker, all_tickers, per_ticker, interval, iterations, model, use_leaps, option_type, warm_start):
     """LLM-driven parameter optimization across strategies and tickers.
 
     Use --per-ticker to save a separate optimized YAML per ticker.
@@ -90,15 +91,16 @@ def optimize(strategy, all_strategies, ticker, all_tickers, per_ticker, interval
     from stonkslib.llm.optimizer import optimize as run_optimize
     from stonkslib.backtest.strategy import load_strategy
 
-    if not strategy and not all_strategies:
-        print("[!] Provide --strategy <file> or --all-strategies")
+    if not strategy and not all_strategies and not every_strategy:
+        print("[!] Provide --strategy <file>, --all-strategies, or --every-strategy")
         return
     if not ticker and not all_tickers:
         print("[!] Provide --ticker <TICKER> or --all-tickers")
         return
 
     tickers = _load_all_tickers() if all_tickers else [ticker]
-    strategy_paths = _load_all_strategies() if all_strategies else [STRATEGY_DIR / strategy]
+    strategy_paths = (resolve_strategy_set(every=every_strategy)
+                      if (all_strategies or every_strategy) else [STRATEGY_DIR / strategy])
 
     missing = [p for p in strategy_paths if not p.exists()]
     if missing:

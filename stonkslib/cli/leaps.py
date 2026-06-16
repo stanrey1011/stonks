@@ -103,3 +103,8 @@ def leaps(target, interval):
 
     results, vix_current, vix_rank = scan_leaps(tickers, interval)
     _print_results(results, vix_current, vix_rank)
+
+    from stonkslib import notify
+    msg = notify.format_leaps_sms(results, vix_current, vix_rank)
+    if msg:
+        notify.send(msg)

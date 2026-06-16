@@ -6,6 +6,7 @@ from pathlib import Path
 
 from stonkslib.backtest.strategy import run_strategy_backtest, load_strategy
 from stonkslib.backtest.leaps import run_leaps_backtest
+from stonkslib.strategies.engine import is_v2
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 OPTIMIZED_DIR = PROJECT_ROOT / "stonkslib" / "strategies" / "optimized"
@@ -18,8 +19,36 @@ Your job is to suggest improved indicator parameters based on backtest results.
 Always return valid JSON only — no explanation outside the JSON object."""
 
 
+def _enabled_indicators(strategy):
+    """Indicators eligible for tuning. Legacy: `enabled: true`. v2: present (and not
+    explicitly disabled), since in v2 presence is what enables an indicator."""
+    v2 = is_v2(strategy)
+    out = {}
+    for k, cfg in (strategy.get("indicators") or {}).items():
+        cfg = cfg or {}
+        if cfg.get("enabled") is False:
+            continue
+        if cfg.get("enabled") or v2:
+            out[k] = cfg
+    return out
+
+
+_CONFLUENCE_INSTRUCTIONS = (
+    "You may also tune the confluence gate: confluence.weights maps each indicator to a "
+    "vote weight (0.0-3.0), and confluence.min_score is the weighted agreement required "
+    "before a trade is taken. Raise weights on indicators that align with profitable trades "
+    "and raise min_score to demand stronger multi-indicator agreement (fewer, higher-quality "
+    "entries). Leave min_score at 0 to disable the gate."
+)
+
+
+def _confluence_json_field():
+    return ('  "confluence": {"min_score": <float>, '
+            '"weights": {"<indicator>": <weight 0.0-3.0>}}')
+
+
 def _build_prompt(strategy, metrics_list):
-    enabled = {k: v for k, v in strategy.get("indicators", {}).items() if v.get("enabled")}
+    enabled = _enabled_indicators(strategy)
     tickers_summary = "\n".join(
         f"  {m['ticker']}: P&L=${m['net_pnl']:.2f}, Trades={m['trades']}, Win rate={m['win_rate']:.1%}"
         for m in metrics_list
@@ -35,26 +64,35 @@ Enabled indicators and current params:
 Risk settings:
 {json.dumps(strategy.get("risk", {}), indent=2)}
 
+Current confluence gate (weights + min_score):
+{json.dumps(strategy.get("confluence", {}), indent=2)}
+
 Backtest results across {len(metrics_list)} ticker(s) ({metrics_list[0]["interval"]}):
 {tickers_summary}
 Average P&L: ${avg_pnl:.2f} | Average win rate: {avg_win:.1%}
 
 Suggest new parameter values to improve average P&L and win rate across all tickers.
+{_CONFLUENCE_INSTRUCTIONS}
 Prioritize signal quality over quantity — fewer high-conviction entries beat many weak ones.
 Raise thresholds (RSI levels, MACD sensitivity, BB periods) to reduce false signals and whipsaws.
 A strategy that fires 3-5 times per month with 65%+ win rate is better than one firing daily at 45%.
+IMPORTANT — Markov chain constraints: bull_threshold and bear_threshold are probabilities drawn from a
+transition matrix. With typical lookback (60-120 bars) and 3 states, the maximum observable probability
+is ~0.55-0.65. Never set these thresholds above 0.62. To reduce signals, prefer increasing lookback
+(60→90→120) or states (3→4→5) rather than raising thresholds above 0.55.
 Return ONLY this JSON structure (keep the same indicator names, only change numeric param values):
 {{
   "reasoning": "one sentence explaining the changes",
   "indicators": {{
     "<indicator_name>": {{"params": {{"<param>": <value>}}}}
   }},
-  "risk": {{"risk_per_trade": <float>, "stop_loss_pct": <float>}}
+  "risk": {{"risk_per_trade": <float>, "stop_loss_pct": <float>}},
+{_confluence_json_field()}
 }}"""
 
 
 def _build_leaps_prompt(strategy, metrics_list, option_type):
-    enabled = {k: v for k, v in strategy.get("indicators", {}).items() if v.get("enabled")}
+    enabled = _enabled_indicators(strategy)
     tickers_summary = "\n".join(
         f"  {m['ticker']}: P&L=${m['net_pnl']:.2f}, Avg%={m.get('avg_pnl_pct', 0):.1f}%, "
         f"Trades={m['trades']}, Win rate={m['win_rate']:.1%}"
@@ -88,6 +126,7 @@ Average net P&L: ${avg_pnl:.2f} | Win rate: {avg_win:.1%} | Avg trade return: {a
 Suggest parameter changes to improve average trade return % and win rate.
 Prefer changes that raise signal thresholds (stronger confirmation before entry),
 reduce whipsaw entries, and suit {direction} momentum moves.
+{_CONFLUENCE_INSTRUCTIONS}
 
 Return ONLY this JSON structure (keep the same indicator names, only change numeric param values):
 {{
@@ -95,19 +134,30 @@ Return ONLY this JSON structure (keep the same indicator names, only change nume
   "indicators": {{
     "<indicator_name>": {{"params": {{"<param>": <value>}}}}
   }},
-  "risk": {{"risk_per_trade": <float>, "stop_loss_pct": <float>}}
+  "risk": {{"risk_per_trade": <float>, "stop_loss_pct": <float>}},
+{_confluence_json_field()}
 }}"""
 
 
 def _apply_suggestions(strategy, suggestions):
     updated = copy.deepcopy(strategy)
+    v2 = is_v2(updated)
     for ind_name, ind_data in suggestions.get("indicators", {}).items():
-        if ind_name in updated.get("indicators", {}) and updated["indicators"][ind_name].get("enabled"):
-            new_params = ind_data.get("params", {})
-            updated["indicators"][ind_name]["params"].update(new_params)
+        cfg = updated.get("indicators", {}).get(ind_name)
+        if cfg is None or cfg.get("enabled") is False:
+            continue
+        if cfg.get("enabled") or v2:  # legacy enabled, or v2 (presence enables)
+            cfg.setdefault("params", {}).update(ind_data.get("params", {}))
     risk_updates = suggestions.get("risk", {})
     if risk_updates:
         updated.setdefault("risk", {}).update(risk_updates)
+    conf_updates = suggestions.get("confluence", {}) or {}
+    if conf_updates:
+        conf = updated.setdefault("confluence", {})
+        if "min_score" in conf_updates:
+            conf["min_score"] = conf_updates["min_score"]
+        if conf_updates.get("weights"):
+            conf.setdefault("weights", {}).update(conf_updates["weights"])
     return updated
 
 
@@ -158,6 +208,7 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
         tickers = [tickers]
 
     best_strategy = copy.deepcopy(strategy)
+    next_strategy = copy.deepcopy(strategy)
     best_metrics_list = None
     history = []
     mode = f"LEAP {option_type}" if use_leaps else "equity"
@@ -166,7 +217,7 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
 
     for i in range(iterations):
         logger.info(f"\n--- Iteration {i + 1}/{iterations} ---")
-        current = best_strategy if i > 0 else strategy
+        current = next_strategy if i > 0 else strategy
 
         metrics_list = []
         for ticker in tickers:
@@ -215,7 +266,8 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
             )
             suggestions = json.loads(response.message.content)
             logger.info(f"    LLM: {suggestions.get('reasoning', '')}")
-            best_strategy = _apply_suggestions(best_strategy, suggestions)
+            # Apply suggestions to a fresh copy of best — never mutate best_strategy itself
+            next_strategy = _apply_suggestions(copy.deepcopy(best_strategy), suggestions)
         except ConnectionError:
             logger.error("[!] Ollama not running — start with: ollama serve")
             break

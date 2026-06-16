@@ -1,0 +1,39 @@
+name: "Markov Chain"
+description: "Regime detection via discrete Markov chain transition probabilities on log returns"
+
+indicators:
+  markov:
+    enabled: true
+    params:
+      states: 3            # number of return regimes (down / flat / up)
+      lookback: 60         # bars used to build the transition matrix
+      bull_threshold: 0.5  # P(current → bullish state) required to fire BUY
+      bear_threshold: 0.5  # P(current → bearish state) required to fire SELL
+  rsi:
+    enabled: false
+  macd:
+    enabled: false
+  bollinger:
+    enabled: false
+  ma_double:
+    enabled: false
+  supertrend:
+    enabled: false
+  rsi_divergence:
+    enabled: false
+
+patterns:
+  doubles:
+    enabled: false
+  triangles:
+    enabled: false
+  head_shoulders:
+    enabled: false
+  wedges:
+    enabled: false
+
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2
+  stop_loss_pct: 0.08
+  slippage: 0.0005

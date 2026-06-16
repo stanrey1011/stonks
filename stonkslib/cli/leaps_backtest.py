@@ -3,6 +3,8 @@ import yaml
 from pathlib import Path
 from stonkslib.utils.logging import setup_logging
 
+from stonkslib.utils.active_strategies import resolve_strategy_set
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STRATEGY_DIR = PROJECT_ROOT / "stonkslib" / "strategies"
 TICKER_YAML = PROJECT_ROOT / "tickers.yaml"
@@ -75,7 +77,9 @@ def _print_results(all_results):
 @click.option("--strategy", default=None,
               help="Strategy YAML (e.g. rsi.yaml). Omit for --all-strategies.")
 @click.option("--all-strategies", "all_strategies", is_flag=True,
-              help="Run against all strategy YAMLs")
+              help="Run the curated active strategy set (config.yaml: active_strategies)")
+@click.option("--every-strategy", "every_strategy", is_flag=True,
+              help="Run EVERY strategy YAML (full sweep; implies --all-strategies)")
 @click.option("--option-type", "option_type",
               type=click.Choice(["call", "put", "auto"]), default="auto", show_default=True,
               help="'call'=bullish signals only, 'put'=bearish only, 'auto'=both")
@@ -86,7 +90,7 @@ def _print_results(all_results):
               help="Strike as fraction of spot (1.0=ATM, 0.95=slightly ITM call)")
 @click.option("--stop-loss", "stop_loss_pct", default=0.50, show_default=True,
               help="Close if option loses this fraction of entry premium")
-def leaps_backtest(target, strategy, all_strategies, option_type, interval,
+def leaps_backtest(target, strategy, all_strategies, every_strategy, option_type, interval,
                    leap_days, strike_moneyness, stop_loss_pct):
     """Backtest LEAP call/put options using Black-Scholes pricing on historical data.
 
@@ -105,13 +109,13 @@ def leaps_backtest(target, strategy, all_strategies, option_type, interval,
     if not target:
         print("[!] Provide a ticker, category, or 'all'")
         return
-    if not strategy and not all_strategies:
-        print("[!] Provide --strategy <file> or --all-strategies")
+    if not strategy and not all_strategies and not every_strategy:
+        print("[!] Provide --strategy <file>, --all-strategies, or --every-strategy")
         return
 
     tickers = _resolve_tickers(target)
-    strategy_paths = (list(STRATEGY_DIR.glob("*.yaml")) if all_strategies
-                      else [STRATEGY_DIR / strategy])
+    strategy_paths = (resolve_strategy_set(every=every_strategy)
+                      if (all_strategies or every_strategy) else [STRATEGY_DIR / strategy])
 
     missing = [p for p in strategy_paths if not p.exists()]
     if missing:

@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import shutil
 import yaml
 import pandas as pd
 import streamlit as st
@@ -11,7 +12,8 @@ BACKTEST_DIR = PROJECT_ROOT / "data" / "backtest_results" / "strategy"
 CLEAN_DIR = PROJECT_ROOT / "data" / "ticker_data" / "clean"
 SIGNALS_DIR  = PROJECT_ROOT / "data" / "analysis" / "signals"
 MERGED_DIR   = PROJECT_ROOT / "data" / "analysis" / "merged" / "by-indicators"
-STONKS_BIN = PROJECT_ROOT / "venv" / "bin" / "stonks"
+_stonks_which = shutil.which("stonks")
+STONKS_BIN = Path(_stonks_which) if _stonks_which else PROJECT_ROOT / "venv" / "bin" / "stonks"
 
 INTERVALS = ["1d", "1wk", "1h", "1m", "2m", "5m", "15m", "30m"]
 VALID_CATEGORIES = ["stocks", "crypto", "etfs"]
@@ -80,6 +82,25 @@ def render_positions_table(df: pd.DataFrame):
     col_cfg = {
         "symbol":             st.column_config.TextColumn("Symbol",    width="small"),
         "qty":                st.column_config.NumberColumn("Qty",     format="%.4g", width="small"),
+        "avg_cost":           st.column_config.NumberColumn("Avg Cost", format="$%.2f", width="small"),
+        "market_value":       st.column_config.NumberColumn("Mkt Value", format="$%.2f", width="small"),
+        "unrealized_pnl":     st.column_config.NumberColumn("Unreal P&L", format="$%.2f", width="small"),
+        "unrealized_pnl_pct": st.column_config.NumberColumn("P&L %", format="%.2f%%", width="small"),
+    }
+    st.dataframe(df, column_config=col_cfg, use_container_width=True, hide_index=True)
+
+
+def render_options_table(df: pd.DataFrame):
+    if df is None or df.empty:
+        st.info("No open option positions.")
+        return
+    col_cfg = {
+        "symbol":             st.column_config.TextColumn("Underlying", width="small"),
+        "contract":           st.column_config.TextColumn("Contract",   width="medium"),
+        "type":               st.column_config.TextColumn("Type",       width="small"),
+        "strike":             st.column_config.NumberColumn("Strike",   format="$%.2f", width="small"),
+        "expiry":             st.column_config.TextColumn("Expiry",     width="small"),
+        "qty":                st.column_config.NumberColumn("Contracts", format="%.4g", width="small"),
         "avg_cost":           st.column_config.NumberColumn("Avg Cost", format="$%.2f", width="small"),
         "market_value":       st.column_config.NumberColumn("Mkt Value", format="$%.2f", width="small"),
         "unrealized_pnl":     st.column_config.NumberColumn("Unreal P&L", format="$%.2f", width="small"),

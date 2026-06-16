@@ -87,4 +87,4 @@ websockets==15.0.1
 yarl==1.23.0
 yfinance==0.2.62
 zipp==3.23.0
--e /home/as/stonks
+-e /home/as/homelab/apps/stonks

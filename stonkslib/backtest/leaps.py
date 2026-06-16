@@ -20,6 +20,7 @@ from stonkslib.indicators.bollinger import bollinger_bands
 from stonkslib.indicators.moving_avg_double import moving_averages
 from stonkslib.indicators.supertrend import supertrend as calc_supertrend
 from stonkslib.indicators.rsi_divergence import rsi_divergence as calc_rsi_div
+from stonkslib.indicators.markov import markov_signals as calc_markov
 from stonkslib.utils.load_td import load_td
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -134,6 +135,17 @@ def run_leaps_backtest(ticker, interval, strategy, option_type="auto",
         div_series = calc_rsi_div(df.copy(), period=p.get("period", 14),
                                   lookback=p.get("lookback", 20))
 
+    mk_series = None
+    mk_bull_thr = 0.6
+    mk_bear_thr = 0.6
+    mk_cfg = ind.get("markov", {})
+    if mk_cfg.get("enabled"):
+        p = mk_cfg.get("params", {})
+        mk_bull_thr = p.get("bull_threshold", 0.6)
+        mk_bear_thr = p.get("bear_threshold", 0.6)
+        mk_series = calc_markov(df.copy(), states=p.get("states", 3),
+                                lookback=p.get("lookback", 60))
+
     vol_series = _realized_vol(df["Close"])
 
     bar_years = 1 / 52 if interval == "1wk" else 1 / 252
@@ -243,6 +255,8 @@ def run_leaps_backtest(ticker, interval, strategy, option_type="auto",
         bl = float(bb_lower.iloc[idx])        if bb_lower        is not None and idx < len(bb_lower)        else None
         sw = float(ma_swing_series.iloc[idx]) if ma_swing_series is not None and idx < len(ma_swing_series) else None
         ml = float(ma_long_series.iloc[idx])  if ma_long_series  is not None and idx < len(ma_long_series)  else None
+        mk_bull = float(mk_series["bull_prob"].iloc[idx]) if mk_series is not None and idx < len(mk_series) and not pd.isna(mk_series["bull_prob"].iloc[idx]) else None
+        mk_bear = float(mk_series["bear_prob"].iloc[idx]) if mk_series is not None and idx < len(mk_series) and not pd.isna(mk_series["bear_prob"].iloc[idx]) else None
 
         bb_and_rsi = bl is not None and rsi_series is not None
 
@@ -289,6 +303,11 @@ def run_leaps_backtest(ticker, interval, strategy, option_type="auto",
                 buy_signal = True
             if div_series["Bearish_Divergence"].iloc[idx]:
                 sell_signal = True
+
+        if mk_bull is not None and mk_bull > mk_bull_thr:
+            buy_signal = True
+        if mk_bear is not None and mk_bear > mk_bear_thr:
+            sell_signal = True
 
         # Map option_type to entry direction
         enters_on_buy  = option_type in ("call", "auto")

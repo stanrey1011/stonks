@@ -82,6 +82,13 @@ def _get_ma_triple(ticker: str, interval: str, short: int, medium: int, long_: i
                                   long_window=long_, ma_type="EMA")
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _get_markov(ticker: str, interval: str, states: int, lookback: int) -> pd.DataFrame:
+    from stonkslib.indicators.markov import markov_signals
+    df = load_ticker_data(ticker, interval)
+    return markov_signals(df.copy(), states=states, lookback=lookback)
+
+
 # ── lookback map: label → bars per interval ───────────────────────────────────
 
 _LOOKBACK = {
@@ -111,6 +118,7 @@ with st.sidebar:
     show_ma_triple = st.checkbox("Triple MA (9/21/50 EMA)", key="chart_ma3")
     show_macd      = st.checkbox("MACD",                  key="chart_macd")
     show_rsi       = st.checkbox("RSI",                   key="chart_rsi")
+    show_markov    = st.checkbox("Markov Regime",         key="chart_markov")
     show_earnings  = st.checkbox("Earnings",              key="chart_earnings")
     show_forward   = st.checkbox("Forward markers (15/30/45d)", key="chart_forward")
     lookback_label = st.selectbox("Lookback", list(_LOOKBACK.keys()), index=2, key="chart_lookback")
@@ -127,6 +135,7 @@ macd_params = {"short": 12, "long": 26, "signal": 9}
 bb_params   = {"window": 20, "num_std_dev": 2}
 ma_double_params = {"swing": 20, "long": 50}
 ma_triple_params = {"short": 9, "medium": 21, "long": 50}
+markov_params = {"states": 3, "lookback": 60, "bull_threshold": 0.5, "bear_threshold": 0.5}
 
 if chosen_name != "None":
     strat_path, strat_src = _resolve_strategy(strategy_map[chosen_name], ticker)
@@ -151,6 +160,10 @@ if chosen_name != "None":
     if ind.get("ma_triple", {}).get("enabled"):
         show_ma_triple = True
 
+    if ind.get("markov", {}).get("enabled"):
+        markov_params = {**markov_params, **ind["markov"].get("params", {})}
+        show_markov = True
+
     badge = {"per-ticker optimized": "🟢 per-ticker opt",
              "global optimized":     "🟡 global opt",
              "base":                 "⚪ base"}.get(strat_src, strat_src)
@@ -169,7 +182,7 @@ asset_type = next((cat for cat, items in wl.items() if items and ticker in items
 
 # ── build subplot layout ──────────────────────────────────────────────────────
 
-show_sub    = show_rsi or show_macd
+show_sub    = show_rsi or show_macd or show_markov
 n_rows      = 3 if show_sub else 2
 row_heights = [0.60, 0.20, 0.20] if show_sub else [0.75, 0.25]
 
@@ -274,6 +287,51 @@ if show_sub:
             ), row=sub_row, col=1)
         fig.add_hline(y=0, line_width=1, line_color="rgba(255,255,255,0.2)", row=sub_row, col=1)
         fig.update_yaxes(title_text="MACD", row=sub_row, col=1)
+
+    elif show_markov:
+        states   = markov_params.get("states", 3)
+        lookback = markov_params.get("lookback", 60)
+        bull_thr = markov_params.get("bull_threshold", 0.5)
+        bear_thr = markov_params.get("bear_threshold", 0.5)
+        opt_star = " ★" if chosen_name != "None" and strat_src != "base" else ""
+        mk = _get_markov(ticker, interval, states, lookback).iloc[-lookback_bars:]
+
+        fig.add_trace(go.Scatter(
+            x=mk.index, y=mk["bull_prob"],
+            mode="lines", name=f"Bull prob{opt_star}",
+            line=dict(width=1.5, color="#26a69a"),
+        ), row=sub_row, col=1)
+        fig.add_trace(go.Scatter(
+            x=mk.index, y=mk["bear_prob"],
+            mode="lines", name=f"Bear prob{opt_star}",
+            line=dict(width=1.5, color="#ef5350"),
+        ), row=sub_row, col=1)
+
+        # threshold lines
+        fig.add_hline(y=bull_thr, line_dash="dot",
+                      line_color="rgba(38,166,154,0.5)", row=sub_row, col=1)
+        fig.add_hline(y=bear_thr, line_dash="dot",
+                      line_color="rgba(239,83,80,0.5)",  row=sub_row, col=1)
+
+        # signal dots on the price chart
+        buy_mask  = mk["bull_prob"] > bull_thr
+        sell_mask = mk["bear_prob"] > bear_thr
+        if buy_mask.any():
+            buy_prices = df["Low"].reindex(mk.index[buy_mask]) * 0.985
+            fig.add_trace(go.Scatter(
+                x=mk.index[buy_mask], y=buy_prices,
+                mode="markers", name="Markov BUY",
+                marker=dict(symbol="triangle-up", size=10, color="#26a69a"),
+            ), row=1, col=1)
+        if sell_mask.any():
+            sell_prices = df["High"].reindex(mk.index[sell_mask]) * 1.015
+            fig.add_trace(go.Scatter(
+                x=mk.index[sell_mask], y=sell_prices,
+                mode="markers", name="Markov SELL",
+                marker=dict(symbol="triangle-down", size=10, color="#ef5350"),
+            ), row=1, col=1)
+
+        fig.update_yaxes(title_text="Markov", range=[0, 1], row=sub_row, col=1)
 
 # ── layout ────────────────────────────────────────────────────────────────────
 

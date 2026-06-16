@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-STONKS_DIR="/home/as/stonks"
+STONKS_DIR="/home/as/homelab/apps/stonks"
 VENV="$STONKS_DIR/venv/bin/stonks"
 LOG="$STONKS_DIR/log/daily_alert.log"
 

@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import json
+import yaml
 
 from stonkslib.dash.common import (
     load_watchlist, flat_tickers, load_ticker_data,
@@ -24,6 +25,10 @@ if not tickers:
 
 # ── selectors ─────────────────────────────────────────────────────────────────
 
+_all_strategy_paths = sorted(STRATEGY_DIR.glob("*.yaml"))
+_all_strategy_names = [yaml.safe_load(p.read_text()).get("name", p.stem) for p in _all_strategy_paths]
+_all_strategy_map   = dict(zip(_all_strategy_names, _all_strategy_paths))
+
 col1, col2, col3 = st.columns([3, 1, 1])
 with col1:
     ticker = st.selectbox("Ticker", tickers, key="bt_ticker")
@@ -33,6 +38,13 @@ with col3:
     st.write("")
     st.write("")
     run = st.button("Run Backtest", type="primary", use_container_width=True)
+
+selected_strategy_names = st.multiselect(
+    "Strategies to run",
+    options=_all_strategy_names,
+    default=_all_strategy_names,
+    key="bt_strategies",
+)
 
 # ── date range ────────────────────────────────────────────────────────────────
 
@@ -242,7 +254,9 @@ def _show_comparison(all_results, bh_m=None):
                 value=f"{score:.0f} / 100",
                 delta=f"{pnl/invested*100:+.1f}% return · {m.get('win_rate',0):.0%} win rate",
             )
-            st.caption(f"Exit: {mode} · Drawdown: {m.get('max_drawdown',0):.1%} · Trades: {m.get('trades',0)}")
+            _ts = m.get("timing_score")
+            _ts_txt = f" · Timing: {_ts:.0f}/100" if _ts is not None else ""
+            st.caption(f"Exit: {mode} · Drawdown: {m.get('max_drawdown',0):.1%} · Trades: {m.get('trades',0)}{_ts_txt}")
 
     st.divider()
 
@@ -260,6 +274,7 @@ def _show_comparison(all_results, bh_m=None):
             "Net P&L":      round(pnl, 2),
             "Return %":     round(pnl / invested * 100, 2) if invested else 0.0,
             "Win rate":     round(m.get("win_rate", 0) * 100, 1),
+            "Timing":       m.get("timing_score"),
             "Trades":       m.get("trades", 0),
             "Max DD %":     round(m.get("max_drawdown", 0) * 100, 2),
             "Final cash":   round(m.get("final_cash", invested), 2),
@@ -276,6 +291,7 @@ def _show_comparison(all_results, bh_m=None):
             "Net P&L":      round(pnl, 2),
             "Return %":     round(pnl / invested * 100, 2) if invested else 0.0,
             "Win rate":     None,
+            "Timing":       None,
             "Trades":       bh_m.get("trades", 1),
             "Max DD %":     round(bh_m.get("max_drawdown", 0) * 100, 2),
             "Final cash":   round(bh_m.get("final_cash", invested), 2),
@@ -285,6 +301,7 @@ def _show_comparison(all_results, bh_m=None):
         "Net P&L":    st.column_config.NumberColumn("Net P&L",    format="$%.2f"),
         "Return %":   st.column_config.NumberColumn("Return %",   format="%.2f%%"),
         "Win rate":   st.column_config.NumberColumn("Win rate",   format="%.1f%%"),
+        "Timing":     st.column_config.NumberColumn("Timing", format="%.0f", help="0–100: how close entries sat to local lows and exits to local highs (higher = better-timed)"),
         "Max DD %":   st.column_config.NumberColumn("Max DD %",   format="%.2f%%"),
         "Final cash": st.column_config.NumberColumn("Final cash", format="$%.2f"),
     }
@@ -305,7 +322,10 @@ if run:
     if _window is None or _window.empty:
         st.warning("No data in selected date range.")
     else:
-        strategy_paths = list(STRATEGY_DIR.glob("*.yaml"))
+        strategy_paths = [_all_strategy_map[n] for n in selected_strategy_names if n in _all_strategy_map]
+        if not strategy_paths:
+            st.warning("No strategies selected.")
+            st.stop()
         all_results = []
 
         with st.status(f"Running backtests for {ticker} ({interval})...", expanded=True) as status:

@@ -186,9 +186,34 @@ def account_positions(account_id: str) -> list[dict]:
     return _request("GET", f"/accounts/{account_id}/positions", query=_user_query()) or []
 
 
+def account_options(account_id: str) -> list[dict]:
+    """Option holdings for an account. SnapTrade returns either a bare list or an
+    object wrapping it under `option_positions`/`positions` depending on the
+    brokerage integration — normalize to a list."""
+    resp = _request("GET", f"/accounts/{account_id}/options", query=_user_query())
+    if isinstance(resp, dict):
+        return resp.get("option_positions") or resp.get("positions") or []
+    return resp or []
+
+
 def account_balances(account_id: str) -> list[dict]:
     return _request("GET", f"/accounts/{account_id}/balances", query=_user_query()) or []
 
 
 def account_orders(account_id: str) -> list[dict]:
     return _request("GET", f"/accounts/{account_id}/orders", query=_user_query()) or []
+
+
+def account_return_rates(account_id: str):
+    """Performance/return rates for an account. Brokerage-dependent — Robinhood may
+    not support it. Returns whatever SnapTrade sends (dict or list) for inspection."""
+    return _request("GET", f"/accounts/{account_id}/returnRates", query=_user_query())
+
+
+def account_activities(account_id: str) -> list[dict]:
+    """Transactions/activities (dividends, deposits, trades). Robinhood syncs
+    holdings only, so this is typically empty. Normalizes the list/wrapped shapes."""
+    resp = _request("GET", f"/accounts/{account_id}/activities", query=_user_query())
+    if isinstance(resp, dict):
+        return resp.get("data") or resp.get("activities") or []
+    return resp or []
