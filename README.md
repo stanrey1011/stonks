@@ -16,8 +16,7 @@ A local-first quantitative trading toolkit for stocks, ETFs, and crypto. Fetches
 - **LEAP options scanner** — VIX rank as IV proxy + live options chain; ranks call/put opportunities across watchlist
 - **LEAP backtesting** — Black-Scholes simulation; exits on stop-loss or expiry only (you decide when to sell)
 - **LEAP optimization** — scores strategies by avg trade % return (not net P&L) for options-appropriate tuning
-- **Daily alerts** — cron job posts BUY/SELL signals + LEAP scan to Discord every weekday at 4:30pm ET
-- **Discord bot** — manage watchlist, run scans, backtest, optimize, and scan LEAPs from chat
+- **Daily alerts** — scheduled scan posts BUY/SELL signals + LEAP scan to logs every weekday at 4:30pm ET (Matrix push alerts planned)
 - **Open WebUI tool** — all features accessible via the LLM chat interface (install `owui_tool.py` as a Tool)
 - **Data freshness view** — `stonks status` shows what data you have and what's been optimized
 
@@ -195,60 +194,30 @@ Shows watchlist, data freshness per ticker/interval, and which strategies have b
 
 ---
 
-## Discord Bot
+## Notifications
 
-```sh
-stonks bot
-```
-
-| Command | What it does |
-|---|---|
-| `!help` | Show all commands |
-| `!tickers` | Show watchlist |
-| `!tickers add AMZN stocks` | Add stock to watchlist + run pipeline |
-| `!tickers add SOL-USD crypto` | Add crypto |
-| `!tickers remove TSLA` | Remove from watchlist |
-| `!alert` | Scan all tickers, all strategies (daily) |
-| `!alert 1wk` | Weekly scan — recommended before buying LEAPs |
-| `!alert AAPL 1wk` | Single ticker weekly scan |
-| `!backtest AAPL` | Backtest all strategies for a ticker |
-| `!backtest AAPL 1wk` | Weekly backtest |
-| `!trades AAPL rsi` | Equity trade log for a strategy |
-| `!optimize AAPL` | Per-ticker optimize all strategies |
-| `!optimize AAPL 1wk` | Optimize on weekly bars |
-| `!optimize AAPL leaps call` | LEAP call optimization (scores by avg trade %) |
-| `!optimize AAPL leaps put` | LEAP put optimization |
-| `!leaps` | Scan all tickers for LEAP opportunities (VIX + signals) |
-| `!leaps etfs` | ETFs only (VIX most accurate here) |
-| `!leaps AAPL` | Single ticker LEAP scan |
-| `!leaps-backtest NVDA` | LEAP backtest — auto call/put per signal direction |
-| `!leaps-backtest NVDA call` | Calls only |
-| `!leaps-backtest NVDA 1wk put` | Weekly put backtest |
-| `!leaps-trades NVDA call` | Entry/exit dates for best call strategy |
-| `!leaps-trades NVDA call supertrend` | Specific strategy trade log |
+Discord bot and webhook alerts are removed. Alert scans print to stdout and log files. **Matrix integration is planned** — a self-hosted Matrix server will replace Discord for push alerts.
 
 ---
 
 ## Automation
 
-Both run automatically via systemd — no terminal needed.
+Scheduled jobs run via systemd (host) or Docker supercronic (container).
 
 ```sh
-# Enable on first run
-systemctl --user enable stonks-bot
+# Host systemd (Anton)
 systemctl --user enable stonks-alert.timer
-systemctl --user start stonks-bot
-systemctl --user start stonks-alert.timer
+systemctl --user start stonks-alert.service  # trigger now
+journalctl --user -u stonks-alert -f         # live logs
 
-# Day-to-day management
-systemctl --user status stonks-bot
-systemctl --user restart stonks-bot          # after code changes
-systemctl --user start stonks-alert.service  # trigger alert scan now
-journalctl --user -u stonks-bot -f           # live bot logs
-journalctl --user -u stonks-alert -f         # alert scan logs
+# Docker
+docker compose -f docker-compose.yml up -d   # prod (baked image)
+docker compose up                            # dev (source live-mounted)
+docker compose exec stonks-scheduler stonks pipeline AAPL --interval 1d
+docker compose logs stonks-scheduler -f
 ```
 
-Alert timer fires every weekday at 20:30 UTC (4:30pm ET). Runs the regular signal scan followed by a LEAP options scan, posting both to Discord.
+Alert timer fires every weekday at 20:30 UTC (4:30pm ET). Runs signal scan + LEAP scan, outputs to log.
 
 ---
 

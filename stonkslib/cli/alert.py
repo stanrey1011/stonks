@@ -1,6 +1,5 @@
 import click
 import yaml
-import requests
 from pathlib import Path
 from stonkslib.utils.logging import setup_logging
 
@@ -21,8 +20,7 @@ def _resolve_tickers(target):
     return [target.upper()]
 
 
-def _load_all_strategies():
-    return list(STRATEGY_DIR.glob("*.yaml"))
+from stonkslib.utils.active_strategies import resolve_strategy_set
 
 
 def _resolve_strategy_path(path, ticker=None):
@@ -52,63 +50,21 @@ def _print_signals(all_signals):
         if buys:
             print(f"\n  BUY signals ({len(buys)}):")
             for s in buys:
-                print(f"    {s['ticker']:<8} [{s['interval']}]  ${s['close']:.2f}  {s['date']}")
+                _conf = f"  (confluence {s['confluence']:g})" if s.get("confluence") is not None else ""
+                print(f"    {s['ticker']:<8} [{s['interval']}]  ${s['close']:.2f}  {s['date']}{_conf}")
                 print(f"             Reason: {s['reason']}")
                 if s.get("llm_conviction"):
                     print(f"             LLM: [{s['llm_conviction'].upper()}] {s['llm_reasoning']}")
         if sells:
             print(f"\n  SELL signals ({len(sells)}):")
             for s in sells:
-                print(f"    {s['ticker']:<8} [{s['interval']}]  ${s['close']:.2f}  {s['date']}")
+                _conf = f"  (confluence {s['confluence']:g})" if s.get("confluence") is not None else ""
+                print(f"    {s['ticker']:<8} [{s['interval']}]  ${s['close']:.2f}  {s['date']}{_conf}")
                 print(f"             Reason: {s['reason']}")
                 if s.get("llm_conviction"):
                     print(f"             LLM: [{s['llm_conviction'].upper()}] {s['llm_reasoning']}")
 
     print(f"\n{'='*65}\n")
-
-
-def _send_discord(webhook_url, all_signals, interval):
-    if not all_signals:
-        return
-
-    buys = [s for s in all_signals if s["type"] == "BUY"]
-    sells = [s for s in all_signals if s["type"] == "SELL"]
-    lines = [f"**Stonks Alert** — `{interval}` daily scan"]
-
-    conviction_emoji = {"high": "🔥", "medium": "📊", "low": "⚠️", "none": ""}
-
-    if buys:
-        lines.append("\n**BUY signals**")
-        for s in buys:
-            conv = s.get("llm_conviction", "")
-            emoji = conviction_emoji.get(conv, "")
-            line = f"> `{s['ticker']}` ${s['close']:.2f} — {s['reason']} _(via {s.get('strategy', '?')})_"
-            if emoji:
-                line += f" {emoji} {conv}"
-            lines.append(line)
-            if s.get("llm_reasoning"):
-                lines.append(f"> _{s['llm_reasoning']}_")
-
-    if sells:
-        lines.append("\n**SELL signals**")
-        for s in sells:
-            conv = s.get("llm_conviction", "")
-            emoji = conviction_emoji.get(conv, "")
-            line = f"> `{s['ticker']}` ${s['close']:.2f} — {s['reason']} _(via {s.get('strategy', '?')})_"
-            if emoji:
-                line += f" {emoji} {conv}"
-            lines.append(line)
-            if s.get("llm_reasoning"):
-                lines.append(f"> _{s['llm_reasoning']}_")
-
-    try:
-        resp = requests.post(webhook_url, json={"content": "\n".join(lines)}, timeout=10)
-        if resp.status_code == 204:
-            logger.info("[✓] Discord alert sent")
-        else:
-            logger.warning(f"[!] Discord returned {resp.status_code}: {resp.text}")
-    except Exception as e:
-        logger.error(f"[!] Discord webhook failed: {e}")
 
 
 @click.command()
@@ -117,22 +73,25 @@ def _send_discord(webhook_url, all_signals, interval):
 @click.option("--strategy", default=None,
               help="Strategy YAML filename (e.g. rsi.yaml). Omit for --all-strategies.")
 @click.option("--all-strategies", "all_strategies", is_flag=True,
-              help="Scan using all strategy YAMLs")
+              help="Scan using the curated active strategy set (config.yaml: active_strategies)")
+@click.option("--every-strategy", "every_strategy", is_flag=True,
+              help="Scan using EVERY strategy YAML (full sweep; implies --all-strategies)")
 @click.option("--interval",
               type=click.Choice(["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk"]),
               default="1d", show_default=True)
-@click.option("--webhook-url", "webhook_url", default=None, envvar="STONKS_DISCORD_WEBHOOK",
-              help="Discord webhook URL (or set STONKS_DISCORD_WEBHOOK env var)")
 @click.option("--min-signals", "min_signals", default=1, show_default=True,
               help="Minimum indicators that must agree (BUY or SELL) before alerting")
+@click.option("--min-score", "min_score", default=0.0, show_default=True, type=float,
+              help="Minimum weighted confluence score (per direction). Uses the strategy's "
+                   "confluence.weights; 0 = use the strategy YAML's confluence.min_score")
 @click.option("--confirm-weekly", "confirm_weekly", is_flag=True,
               help="For 1d alerts: require the weekly 20/50 EMA trend to align with signal direction")
 @click.option("--llm-interpret", "llm_interpret", is_flag=True,
               help="Use LLM to assess conviction and add plain-English reasoning to each signal")
 @click.option("--llm-model", "llm_model", default="qwen2.5:7b", show_default=True,
               help="Ollama model for signal interpretation")
-def alert(target, strategy, all_strategies, interval, webhook_url, min_signals, confirm_weekly,
-          llm_interpret, llm_model):
+def alert(target, strategy, all_strategies, every_strategy, interval, min_signals, min_score,
+          confirm_weekly, llm_interpret, llm_model):
     """Scan latest bar for entry/exit signals. Auto-uses optimized strategies when available.
 
     TARGET can be a ticker (AAPL), a category (stocks/etfs/crypto), or 'all'.\n
@@ -147,14 +106,14 @@ def alert(target, strategy, all_strategies, interval, webhook_url, min_signals, 
     if not target:
         print("[!] Provide a ticker (AAPL), category (stocks/etfs/crypto), or 'all'")
         return
-    if not strategy and not all_strategies:
-        print("[!] Provide --strategy <file> or --all-strategies")
+    if not strategy and not all_strategies and not every_strategy:
+        print("[!] Provide --strategy <file>, --all-strategies, or --every-strategy")
         return
 
     tickers = _resolve_tickers(target)
 
-    if all_strategies:
-        strategy_paths = _load_all_strategies()
+    if all_strategies or every_strategy:
+        strategy_paths = resolve_strategy_set(every=every_strategy)
     else:
         strategy_paths = [STRATEGY_DIR / strategy]
 
@@ -180,6 +139,7 @@ def alert(target, strategy, all_strategies, interval, webhook_url, min_signals, 
 
             signals = check_signals(t, interval, strat,
                                    min_signals=min_signals,
+                                   min_score=min_score,
                                    confirm_weekly=confirm_weekly,
                                    llm_interpret=llm_interpret,
                                    llm_model=llm_model)
@@ -195,7 +155,7 @@ def alert(target, strategy, all_strategies, interval, webhook_url, min_signals, 
 
     _print_signals(all_signals)
 
-    if webhook_url and all_signals:
-        _send_discord(webhook_url, all_signals, interval)
-    elif webhook_url and not all_signals:
-        logger.info("No signals — Discord not notified")
+    from stonkslib import notify
+    msg = notify.format_alert_sms(all_signals)
+    if msg:
+        notify.send(msg)

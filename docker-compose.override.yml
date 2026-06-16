@@ -1,0 +1,15 @@
+# Dev override — auto-merged by `docker compose up` (NOT used in prod).
+# Bind-mounts source code for live editing without rebuilding the image.
+# Prod: docker compose -f docker-compose.yml up -d
+# Dev:  docker compose up
+services:
+  stonks-dash:
+    volumes:
+      - .:/app
+      - stonks-data:/app/data
+      - stonks-log:/app/log
+  stonks-scheduler:
+    volumes:
+      - .:/app
+      - stonks-data:/app/data
+      - stonks-log:/app/log

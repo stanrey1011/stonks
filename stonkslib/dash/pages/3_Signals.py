@@ -7,6 +7,7 @@ import pandas as pd
 import yaml
 
 from stonkslib.dash.common import load_watchlist, flat_tickers, STRATEGY_DIR
+from stonkslib.utils.active_strategies import all_strategy_paths, active_strategy_names
 
 st.set_page_config(page_title="Signals — Stonks", layout="wide")
 st.title("Signals")
@@ -17,6 +18,13 @@ tickers = flat_tickers(wl)
 if not tickers:
     st.warning("No tickers in watchlist.")
     st.stop()
+
+_all_stems = [p.stem for p in all_strategy_paths()]
+_active = [s for s in active_strategy_names() if s in _all_stems] or _all_stems
+chosen_stems = st.multiselect(
+    "Strategies to scan", _all_stems, default=_active, key="sig_strategies",
+    help="Defaults to the curated active set (config.yaml: active_strategies). Add more to widen the scan.",
+)
 
 col1, col2, col3 = st.columns([3, 1, 1])
 with col1:
@@ -32,7 +40,7 @@ if run:
     from stonkslib.alerts.signals import check_signals
 
     scan_tickers = tickers if target == "All watchlist" else [target]
-    strategy_paths = list(STRATEGY_DIR.glob("*.yaml"))
+    strategy_paths = [STRATEGY_DIR / f"{s}.yaml" for s in chosen_stems] or all_strategy_paths()
     all_signals = []
 
     progress = st.progress(0, text="Scanning...")

@@ -1,0 +1,30 @@
+version: 2
+name: "RSI + MACD Classic v2"
+description: "v2 expression form of rsi_macd: buy when RSI<30 and MACD>0, sell when RSI>70 (or stop loss). Parity reference for the expression engine."
+
+# In v2, listing an indicator under `indicators:` enables it. The buy/sell logic
+# lives in the `entry:` / `exit:` expressions below, evaluated against the named
+# outputs from the indicator registry (rsi, macd, macd_signal, ...).
+indicators:
+  rsi:
+    params:
+      period: 7
+  macd:
+    params:
+      short: 12
+      long: 26
+      signal: 9
+
+entry: "rsi < 30 and macd > 0"
+exit: "rsi > 70"
+
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2
+
+# Per-indicator confluence votes use registry defaults unless overridden here.
+confluence:
+  min_score: 0
+  weights:
+    macd: 1.2
+    rsi: 1.0

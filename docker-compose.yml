@@ -2,40 +2,58 @@ services:
 
   stonks-dash:
     build: .
+    image: stonks:latest
     container_name: stonks-dash
     ports:
       - "8501:8501"
-    volumes:
-      - .:/app
     env_file: .env
     environment:
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  stonks-bot:
-    build: .
-    container_name: stonks-bot
     volumes:
-      - .:/app
-    env_file: .env
-    environment:
-      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: python stonkslib/bot/discord_bot.py
+      - stonks-data:/app/data
+      - stonks-log:/app/log
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   stonks-scheduler:
     build: .
+    image: stonks:latest
     container_name: stonks-scheduler
-    volumes:
-      - .:/app
+    init: true
     env_file: .env
     environment:
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - stonks-data:/app/data
+      - stonks-log:/app/log
     command: supercronic /app/docker/crontab
     restart: unless-stopped
+
+  # DISABLED: Discord bot — re-enable or replace with Matrix notification backend
+  # stonks-bot:
+  #   build: .
+  #   image: stonks:latest
+  #   container_name: stonks-bot
+  #   env_file: .env
+  #   environment:
+  #     - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   volumes:
+  #     - stonks-data:/app/data
+  #     - stonks-log:/app/log
+  #   command: stonks bot
+  #   restart: unless-stopped
+
+volumes:
+  stonks-data:
+  stonks-log:

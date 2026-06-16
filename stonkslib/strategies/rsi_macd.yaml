@@ -25,3 +25,17 @@ patterns:
 risk:
   start_cash: 10000
   risk_per_trade: 0.2
+# Optional weighted confluence gate. Each enabled indicator that fires in a
+# direction contributes its weight (default 1.0); a signal is kept only if its
+# direction's total weight >= min_score. min_score: 0 disables the gate (default
+# behavior). Trend indicators are trusted more than mean-reversion ones here.
+confluence:
+  min_score: 0
+  weights:
+    supertrend: 1.5
+    macd: 1.2
+    ma_double: 1.2
+    rsi: 1.0
+    bollinger: 1.0
+    rsi_divergence: 1.0
+    markov: 0.5

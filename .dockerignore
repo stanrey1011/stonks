@@ -4,5 +4,11 @@ __pycache__/
 *.pyo
 data/
 log/
+charts/
+tests/
 .env
+.env.*
 .git/
+.gitignore
+*.md
+docker-compose.override.yml

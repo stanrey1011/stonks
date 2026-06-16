@@ -24,7 +24,6 @@ dependencies = [
     "scipy",
     "streamlit",
     "ollama",
-    "discord.py>=2.3.0",
     "alpaca-py",
     "python-dotenv",
 ]

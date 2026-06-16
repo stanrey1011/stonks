@@ -20,9 +20,12 @@ def _resolve_tickers(target):
     return [target.upper()]
 
 
-def _load_strategies(all_strategies, strategy):
-    if all_strategies:
-        return list(STRATEGY_DIR.glob("*.yaml"))
+from stonkslib.utils.active_strategies import resolve_strategy_set
+
+
+def _load_strategies(all_strategies, every_strategy, strategy):
+    if all_strategies or every_strategy:
+        return resolve_strategy_set(every=every_strategy)
     return [STRATEGY_DIR / strategy]
 
 
@@ -32,11 +35,13 @@ def _load_strategies(all_strategies, strategy):
 @click.option("--strategy", default=None,
               help="Strategy YAML filename (e.g. rsi.yaml). Omit for --all-strategies.")
 @click.option("--all-strategies", "all_strategies", is_flag=True,
-              help="Run all strategy YAMLs")
+              help="Run the curated active strategy set (config.yaml: active_strategies)")
+@click.option("--every-strategy", "every_strategy", is_flag=True,
+              help="Run EVERY strategy YAML (full sweep; implies --all-strategies)")
 @click.option("--interval",
               type=click.Choice(["1m", "5m", "15m", "30m", "1h", "1d", "1wk"]),
               default="1d", show_default=True)
-def backtest(target, strategy, all_strategies, interval):
+def backtest(target, strategy, all_strategies, every_strategy, interval):
     """Run strategy backtests.
 
     TARGET can be a ticker (AAPL), a category (stocks/etfs/crypto), or 'all'.\n
@@ -51,12 +56,12 @@ def backtest(target, strategy, all_strategies, interval):
     if not target:
         print("[!] Provide a ticker (AAPL), category (stocks/etfs/crypto), or 'all'")
         return
-    if not strategy and not all_strategies:
-        print("[!] Provide --strategy <file> or --all-strategies")
+    if not strategy and not all_strategies and not every_strategy:
+        print("[!] Provide --strategy <file>, --all-strategies, or --every-strategy")
         return
 
     tickers = _resolve_tickers(target)
-    strategy_paths = _load_strategies(all_strategies, strategy)
+    strategy_paths = _load_strategies(all_strategies, every_strategy, strategy)
 
     missing = [p for p in strategy_paths if not p.exists()]
     if missing:

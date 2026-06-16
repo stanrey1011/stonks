@@ -1,40 +1,12 @@
-crypto:
-- BTC-USD
-- ETH-USD
-etfs:
-- SPY
-- QQQ
-- SCHD
-- VYM
-- VIG
-- JEPI
-- SPYD
 stocks:
 - AAPL
-- TSLA
-- NVDA
 - MSFT
-- BBAI
-- SOFI
-- DNN
-- LAC
-- WULF
-- USAR
-- AMD
-- IREN
-- UUUU
-- MRVL
-- AMZN
-- AMAT
-- AU
-- MP
-- AVGO
-- GLD
-- XOM
-- TMQ
 - GOOGL
-- CRWV
-- NBIS
-- MARA
-- DVLT
-- DEFT
+- AMZN
+- NVDA
+- META
+- TSLA
+etfs:
+- SPY
+crypto:
+- BTC-USD

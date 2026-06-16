@@ -9,7 +9,6 @@ from stonkslib.cli.export import export
 from stonkslib.cli.optimize import optimize
 from stonkslib.cli.alert import alert
 from stonkslib.cli.tickers import tickers
-from stonkslib.cli.bot import bot
 from stonkslib.cli.pipeline import pipeline
 from stonkslib.cli.status import status
 from stonkslib.cli.dash import dash
@@ -32,7 +31,6 @@ cli.add_command(export)
 cli.add_command(optimize)
 cli.add_command(alert)
 cli.add_command(tickers)
-cli.add_command(bot)
 cli.add_command(pipeline)
 cli.add_command(status)
 cli.add_command(dash)

@@ -17,6 +17,7 @@ pg = st.navigation({
         st.Page(_PAGES_DIR / "2_Confluence.py",   title="Confluence",  icon="📊"),
         st.Page(_PAGES_DIR / "1_Chart.py",        title="Chart",       icon="📈"),
         st.Page(_PAGES_DIR / "3_Signals.py",      title="Signals",     icon="🔔"),
+        st.Page(_PAGES_DIR / "13_Markov.py",      title="Markov",      icon="🔮"),
     ],
     "Portfolio": [
         st.Page(_PAGES_DIR / "8_Alpaca.py",       title="Alpaca",      icon="🦙"),

@@ -65,19 +65,23 @@ def status():
         print()
 
     # --- Optimized strategies ---
+    from stonkslib.utils.active_strategies import active_strategy_names
     all_strategies = list(STRATEGY_DIR.glob("*.yaml"))
     optimized_dir = STRATEGY_DIR / "optimized"
     optimized = {p.stem.replace("_optimized", "") for p in optimized_dir.glob("*_optimized.yaml")} \
         if optimized_dir.exists() else set()
+    active = set(active_strategy_names())
 
-    print(f"\n  Strategies ({len(all_strategies)} total, {len(optimized)} optimized):")
+    print(f"\n  Strategies ({len(all_strategies)} total, {len(active)} active, {len(optimized)} optimized):")
     for path in sorted(all_strategies):
         stem = path.stem
         has_opt = stem in optimized
-        marker = "✓ opt" if has_opt else "     "
+        opt_marker = "✓ opt" if has_opt else "     "
+        active_marker = "★" if stem in active else " "
         with open(path) as f:
             strat = yaml.safe_load(f) or {}
         name = strat.get("name", stem)
-        print(f"    [{marker}] {name}")
+        print(f"    {active_marker} [{opt_marker}] {name}")
+    print("    (★ = in active set used by default fan-outs)")
 
     print(f"\n{'='*65}\n")

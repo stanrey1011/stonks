@@ -18,7 +18,6 @@ contourpy==1.3.2
 cryptography==48.0.0
 curl_cffi==0.11.3
 cycler==0.12.1
-discord.py==2.7.1
 filelock==3.18.0
 fonttools==4.58.2
 frozendict==2.4.6
@@ -88,4 +87,4 @@ websockets==15.0.1
 yarl==1.23.0
 yfinance==0.2.62
 zipp==3.23.0
--e /home/as/stonks
+-e /home/as/homelab/apps/stonks

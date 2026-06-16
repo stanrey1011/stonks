@@ -186,23 +186,15 @@ Key dashboard patterns:
 - Alert results: stored in `st.session_state` + `data/last_alert.json`; pages load from session first, fall back to disk
 - Earnings overlays on Chart: dotted vlines colored green (beat) / red (miss) / grey (no surprise data); next earnings = orange dashed; forward markers (+15/30/45d) = light blue dashed
 
-### Discord bot commands
+### Notifications
 
-```
-!leaps [interval]          # scan watchlist for LEAP opportunities
-!leaps-backtest NVDA call  # run LEAP backtest
-!leaps-trades NVDA         # show entry/exit dates
-!optimize NVDA leaps call  # LEAP-specific optimization
-!alert [interval]          # regular signal scan
-!backtest NVDA [strategy]
-!help
-```
+Discord bot and webhook alerts removed. Alert output goes to stdout/log only. Matrix integration is planned (Phase B — `stonkslib/notify/` module).
 
 ### Config files
 
 - **`tickers.yaml`** — watchlist grouped by category (`stocks`, `etfs`, `crypto`)
 - **`config.yaml`** — canonical paths (`ticker_data_dir`, `options_data_dir`, `strategy_dir`, etc.) and options strategy parameters
-- **`.env`** — `STONKS_DISCORD_WEBHOOK`, `DISCORD_BOT_TOKEN`, `FINNHUB_API_KEY`, Alpaca keys (`ALPACA_API_KEY`/`ALPACA_SECRET_KEY`, optional `ALPACA_LIVE_*`), SnapTrade (`SNAPTRADE_CLIENT_ID`/`SNAPTRADE_CONSUMER_KEY`, for Robinhood) (gitignored)
+- **`.env`** — `FINNHUB_API_KEY`, `OLLAMA_HOST`, Alpaca keys (`ALPACA_API_KEY`/`ALPACA_SECRET_KEY`, optional `ALPACA_LIVE_*`), SnapTrade (`SNAPTRADE_CLIENT_ID`/`SNAPTRADE_CONSUMER_KEY`) (gitignored). See `.env.example` for full list.
 
 ### Brokers
 

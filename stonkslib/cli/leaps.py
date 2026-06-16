@@ -1,6 +1,5 @@
 import click
 import yaml
-import requests
 from pathlib import Path
 from stonkslib.utils.logging import setup_logging
 
@@ -76,43 +75,11 @@ def _print_results(results, vix_current, vix_rank):
     print(f"\n{'='*width}\n")
 
 
-def _send_discord(webhook_url, results, vix_current, vix_rank):
-    lines = [f"**LEAP Scan** — VIX {vix_current} | rank {vix_rank}% | {_vix_label(vix_rank)}"]
-
-    calls = [r for r in results if r["direction"] == "CALL"]
-    puts  = [r for r in results if r["direction"] == "PUT"]
-
-    if calls:
-        lines.append("\n**CALL candidates**")
-        for r in calls:
-            opt = r.get("option")
-            opt_str = f"→ ${opt['strike']:.0f} exp {opt['expiry']}" if opt else ""
-            lines.append(f"> `{r['ticker']}` ${r['current_price']:.2f}  {r['top_reasons'][0] if r['top_reasons'] else ''}  {opt_str}")
-
-    if puts:
-        lines.append("\n**PUT candidates (hedge)**")
-        for r in puts:
-            opt = r.get("option")
-            opt_str = f"→ ${opt['strike']:.0f} exp {opt['expiry']}" if opt else ""
-            lines.append(f"> `{r['ticker']}` ${r['current_price']:.2f}  {r['top_reasons'][0] if r['top_reasons'] else ''}  {opt_str}")
-
-    try:
-        resp = requests.post(webhook_url, json={"content": "\n".join(lines)}, timeout=10)
-        if resp.status_code == 204:
-            logger.info("[✓] Discord LEAP scan sent")
-        else:
-            logger.warning(f"[!] Discord returned {resp.status_code}")
-    except Exception as e:
-        logger.error(f"[!] Discord webhook failed: {e}")
-
-
 @click.command()
 @click.argument("target", required=False, default=None, metavar="[TICKER|CATEGORY|all]")
 @click.option("--interval", type=click.Choice(["1d", "1wk"]), default="1wk", show_default=True,
               help="Price interval for signal detection (1wk recommended for LEAPs)")
-@click.option("--webhook-url", "webhook_url", default=None, envvar="STONKS_DISCORD_WEBHOOK",
-              help="Discord webhook URL")
-def leaps(target, interval, webhook_url):
+def leaps(target, interval):
     """Scan for LEAP call/put opportunities using VIX rank + technical signals.
 
     Aggregates signals from all strategies. VIX rank is used as a market-wide
@@ -137,7 +104,7 @@ def leaps(target, interval, webhook_url):
     results, vix_current, vix_rank = scan_leaps(tickers, interval)
     _print_results(results, vix_current, vix_rank)
 
-    if webhook_url and results:
-        _send_discord(webhook_url, results, vix_current, vix_rank)
-    elif webhook_url and not results:
-        logger.info("No LEAP candidates — Discord not notified")
+    from stonkslib import notify
+    msg = notify.format_leaps_sms(results, vix_current, vix_rank)
+    if msg:
+        notify.send(msg)

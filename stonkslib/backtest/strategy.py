@@ -11,6 +11,9 @@ from stonkslib.indicators.bollinger import bollinger_bands
 from stonkslib.indicators.moving_avg_double import moving_averages
 from stonkslib.indicators.supertrend import supertrend as calc_supertrend
 from stonkslib.indicators.rsi_divergence import rsi_divergence as calc_rsi_div
+from stonkslib.indicators.markov import markov_signals as calc_markov
+from stonkslib.indicators.extrema import timing_quality
+from stonkslib.strategies.engine import is_v2, build_namespace, entry_signals, exit_signals, confluence_scores
 from stonkslib.utils.load_td import load_td
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -70,12 +73,29 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
     stop_loss_pct = float(risk.get("stop_loss_pct", 0.1))
     slippage = float(risk.get("slippage", 0.0005))
 
-    # Compute enabled indicators
+    # v2 strategies carry their own entry/exit logic as expressions — evaluate them
+    # once up front and drive the loop from the resulting boolean Series. Legacy
+    # strategies fall through to the hardcoded per-indicator path below, unchanged.
+    _v2 = is_v2(strategy)
+    entry_sig = exit_sig = None
+    if _v2:
+        _ns = build_namespace(df, strategy)
+        entry_sig = entry_signals(df, strategy, _ns)
+        exit_sig = exit_signals(df, strategy, _ns)
+        # Optional confluence gate: require the weighted BUY vote score to clear
+        # min_score before an entry fires. min_score=0 (default) leaves entries
+        # untouched, preserving parity with the legacy path. Exits are never gated.
+        _min_score = float((strategy.get("confluence") or {}).get("min_score", 0) or 0)
+        if _min_score > 0:
+            _buy_score, _ = confluence_scores(df, strategy, _ns)
+            entry_sig = entry_sig & (_buy_score >= _min_score)
+
+    # Compute enabled indicators (legacy path only)
     rsi_series = None
     rsi_overbought = 70
     rsi_oversold = 30
     rsi_cfg = ind.get("rsi", {})
-    if rsi_cfg.get("enabled"):
+    if not _v2 and rsi_cfg.get("enabled"):
         p = rsi_cfg.get("params", {})
         rsi_overbought = p.get("overbought", 70)
         rsi_oversold = p.get("oversold", 30)
@@ -83,7 +103,7 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
 
     macd_series = None
     macd_cfg = ind.get("macd", {})
-    if macd_cfg.get("enabled"):
+    if not _v2 and macd_cfg.get("enabled"):
         p = macd_cfg.get("params", {})
         macd_out = calc_macd(df.copy(), short_window=p.get("short", 12),
                              long_window=p.get("long", 26), signal_window=p.get("signal", 9))
@@ -91,7 +111,7 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
 
     bb_upper = bb_lower = None
     bb_cfg = ind.get("bollinger", {})
-    if bb_cfg.get("enabled"):
+    if not _v2 and bb_cfg.get("enabled"):
         p = bb_cfg.get("params", {})
         bb_out = bollinger_bands(df.copy(), window=p.get("window", 20),
                                  num_std_dev=p.get("num_std_dev", 2))
@@ -100,7 +120,7 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
 
     ma_swing_series = ma_long_series = None
     ma_cfg = ind.get("ma_double", {})
-    if ma_cfg.get("enabled"):
+    if not _v2 and ma_cfg.get("enabled"):
         p = ma_cfg.get("params", {})
         ma_out = moving_averages(df.copy(), swing_window=p.get("swing", 20),
                                  long_window=p.get("long", 50), ma_type="EMA")
@@ -109,17 +129,28 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
 
     st_series = None
     st_cfg = ind.get("supertrend", {})
-    if st_cfg.get("enabled"):
+    if not _v2 and st_cfg.get("enabled"):
         p = st_cfg.get("params", {})
         st_series = calc_supertrend(df.copy(), period=p.get("period", 10),
                                     multiplier=p.get("multiplier", 3.0))
 
     div_series = None
     div_cfg = ind.get("rsi_divergence", {})
-    if div_cfg.get("enabled"):
+    if not _v2 and div_cfg.get("enabled"):
         p = div_cfg.get("params", {})
         div_series = calc_rsi_div(df.copy(), period=p.get("period", 14),
                                   lookback=p.get("lookback", 20))
+
+    mk_series = None
+    mk_bull_thr = 0.6
+    mk_bear_thr = 0.6
+    mk_cfg = ind.get("markov", {})
+    if not _v2 and mk_cfg.get("enabled"):
+        p = mk_cfg.get("params", {})
+        mk_bull_thr = p.get("bull_threshold", 0.6)
+        mk_bear_thr = p.get("bear_threshold", 0.6)
+        mk_series = calc_markov(df.copy(), states=p.get("states", 3),
+                                lookback=p.get("lookback", 60))
 
     pos = 0.0
     entry_price = None
@@ -181,13 +212,27 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
                 pending_reason = f"Trailing Stop ({trailing_stop_pct:.0%} from ${peak_price:.2f})"
                 continue
 
-        # --- Read indicator values for this bar ---
+        # --- v2: drive entries/exits from precomputed expression signals ---
+        if _v2:
+            if pos == 0 and pending is None:
+                if bool(entry_sig.iloc[idx]):
+                    pending, pending_reason = "buy", "Entry signal"
+            elif pos > 0 and pending is None and not trailing_stop_pct:
+                if bool(exit_sig.iloc[idx]):
+                    pending, pending_reason = "sell", "Exit signal"
+                elif stop_loss_pct > 0 and entry_price and close < entry_price * (1 - stop_loss_pct):
+                    pending, pending_reason = "sell", "Stop Loss"
+            continue
+
+        # --- Read indicator values for this bar (legacy path) ---
         r  = float(rsi_series.iloc[idx])      if rsi_series      is not None and idx < len(rsi_series)      else None
         m  = float(macd_series.iloc[idx])     if macd_series     is not None and idx < len(macd_series)     else None
         bu = float(bb_upper.iloc[idx])        if bb_upper        is not None and idx < len(bb_upper)        else None
         bl = float(bb_lower.iloc[idx])        if bb_lower        is not None and idx < len(bb_lower)        else None
         sw = float(ma_swing_series.iloc[idx]) if ma_swing_series is not None and idx < len(ma_swing_series) else None
         ml = float(ma_long_series.iloc[idx])  if ma_long_series  is not None and idx < len(ma_long_series)  else None
+        mk_bull = float(mk_series["bull_prob"].iloc[idx]) if mk_series is not None and idx < len(mk_series) and not pd.isna(mk_series["bull_prob"].iloc[idx]) else None
+        mk_bear = float(mk_series["bear_prob"].iloc[idx]) if mk_series is not None and idx < len(mk_series) and not pd.isna(mk_series["bear_prob"].iloc[idx]) else None
 
         bb_and_rsi = bl is not None and rsi_series is not None
 
@@ -220,6 +265,9 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
                 if div_series["Bullish_Divergence"].iloc[idx]:
                     pending, pending_reason = "buy", "Bullish RSI divergence"
 
+            if pending is None and mk_bull is not None and mk_bull > mk_bull_thr:
+                pending, pending_reason = "buy", f"Markov P(→bull)={mk_bull:.0%}"
+
         # --- Generate exit signal — skipped in trailing stop mode ---
         elif pos > 0 and pending is None and not trailing_stop_pct:
             if r is not None and r > rsi_overbought:
@@ -238,6 +286,8 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
                     pending, pending_reason = "sell", "Supertrend flipped bearish"
             elif div_series is not None and div_series["Bearish_Divergence"].iloc[idx]:
                 pending, pending_reason = "sell", "Bearish RSI divergence"
+            elif mk_bear is not None and mk_bear > mk_bear_thr:
+                pending, pending_reason = "sell", f"Markov P(→bear)={mk_bear:.0%}"
             elif stop_loss_pct > 0 and entry_price and close < entry_price * (1 - stop_loss_pct):
                 pending, pending_reason = "sell", "Stop Loss"
 
@@ -270,6 +320,10 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
 
     # total_invested: for per-signal mode = sum of $ actually deployed; else start_cash
     total_invested = total_signal_invested if per_signal_amount > 0 else actual_start
+
+    # timing quality: how close each fill sat to a local low (buys) / high (sells)
+    timing = timing_quality(df, trades)
+
     metrics = {
         "ticker": ticker,
         "interval": interval,
@@ -284,6 +338,7 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
         "per_signal_amount": per_signal_amount,
         "slippage_pct": slippage,
         "exit_mode": f"trailing_{int(trailing_stop_pct*100)}pct" if trailing_stop_pct else "indicator",
+        **timing,
         "equity_curve": equity_curve,
     }
 
