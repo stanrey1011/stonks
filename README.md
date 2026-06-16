@@ -25,9 +25,8 @@ A local-first quantitative trading toolkit for stocks, ETFs, and crypto. Fetches
 ## Daily Use
 
 ```sh
-# Check signals right now
-cd /home/as/stonks && source venv/bin/activate
-stonks alert all --all-strategies       # uses optimized YAMLs automatically
+# Check signals right now (Docker: prefix with `docker compose exec stonks-scheduler`)
+stonks alert all --all-strategies       # uses the active strategy set automatically
 
 # Full pipeline for everything
 stonks pipeline                          # 1d
@@ -46,7 +45,36 @@ stonks status
 
 ---
 
-## Quick Start
+## Quick Start — Docker (recommended)
+
+The whole stack (dashboard + scheduler) runs from the included compose file. No Python
+setup required — the image builds from source on first run.
+
+```sh
+git clone https://github.com/stanrey1011/stonks
+cd stonks
+cp .env.example .env            # add API keys if you have them (see below)
+docker compose up -d --build    # builds the image, starts dashboard + scheduler
+```
+
+- Dashboard: **http://localhost:8501**
+- Load some data on first run: `docker compose exec stonks-scheduler stonks pipeline`
+- Update after pulling new code: `docker compose up -d --build`
+- Logs: `docker compose logs -f stonks-dash`
+
+**What needs configuring (all optional — it runs on Yahoo Finance market data with none of these):**
+
+| Variable | Enables |
+|---|---|
+| `FINNHUB_API_KEY` | News headlines + earnings overlays |
+| `OLLAMA_HOST` | LLM strategy optimization + chat (point at an Ollama server, e.g. `http://host.docker.internal:11434`) |
+| `ALPACA_*` | Live Alpaca account view + paper/live trading |
+| `SNAPTRADE_*` | Read-only Robinhood/Schwab/IBKR portfolio view |
+
+> The Confluence/backtest/strategy core works with **zero keys** — keys only add the
+> data-provider and LLM features. Ollama must be reachable for `optimize`/chat.
+
+### Local Python (alternative)
 
 ```sh
 git clone https://github.com/stanrey1011/stonks

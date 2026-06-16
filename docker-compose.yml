@@ -1,8 +1,22 @@
+# Complete stack for stonks. Build-based (no registry needed):
+#
+#   git clone https://github.com/stanrey1011/stonks && cd stonks
+#   cp .env.example .env          # add API keys (optional; runs on market data without them)
+#   docker compose up -d --build  # dashboard at http://localhost:8501
+#
+# Source is baked into the image at build time, so update with `up -d --build`.
+# `docker-compose.override.yml` (auto-merged by plain `docker compose up`) bind-mounts
+# the working tree for live dev — edit + restart, no rebuild.
+#
+# To later serve from a published image instead of building: uncomment the `image:`
+# lines below (pointing at GHCR) and run `docker compose pull && up -d` — no source clone
+# needed by the installer.
 services:
 
   stonks-dash:
     build: .
     image: stonks:latest
+    # image: ghcr.io/stanrey1011/stonks:latest   # ← swap to this once published (drop `build:`)
     container_name: stonks-dash
     ports:
       - "8501:8501"
@@ -25,6 +39,7 @@ services:
   stonks-scheduler:
     build: .
     image: stonks:latest
+    # image: ghcr.io/stanrey1011/stonks:latest   # ← swap to this once published (drop `build:`)
     container_name: stonks-scheduler
     init: true
     env_file: .env
