@@ -20,9 +20,9 @@ git add -A && git commit -m "…"
 git push origin main
 ```
 
-The watchlist (`tickers.yaml`) is tracked in git — **edit it on anton and push**, don't
-change it on prod (a local edit on .208 would conflict with the next pull). Use
-`stonks tickers …` locally, or edit the file directly.
+The watchlist (`tickers.yaml`) is **gitignored / per-host** — edit it freely on prod via
+the dashboard; pulls never touch it. A fresh checkout/container seeds it from the committed
+`tickers.example.yaml` on first run. Only edit `tickers.example.yaml` (the default) on anton.
 
 ## Deploy (.208)
 

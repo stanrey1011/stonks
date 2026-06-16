@@ -28,12 +28,14 @@ RUN curl -fsSL \
 COPY --from=builder /install /usr/local
 
 # Copy application source.
-COPY pyproject.toml tickers.yaml config.yaml ./
+COPY pyproject.toml tickers.example.yaml config.yaml ./
 COPY stonkslib/ stonkslib/
 COPY docker/ docker/
 
 # Install the package entry point (stonks CLI). No compilers needed — wheels already installed.
+# Seed a default watchlist from the example (tickers.yaml is gitignored / per-host state).
 RUN pip install --no-cache-dir -e . \
+    && cp -n tickers.example.yaml tickers.yaml \
     && mkdir -p /app/data /app/log \
     && useradd -u 1000 -m stonks \
     && chown -R stonks:stonks /app

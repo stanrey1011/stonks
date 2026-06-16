@@ -1,0 +1,11 @@
+# Default watchlist for a fresh install. Copied to tickers.yaml on first run
+# (tickers.yaml is gitignored — it's per-host state you manage from the dashboard).
+# Keep this minimal; your real watchlist lives in tickers.yaml.
+stocks:
+- AAPL
+- MSFT
+- NVDA
+etfs:
+- SPY
+crypto:
+- BTC-USD

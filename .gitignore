@@ -45,6 +45,10 @@ dist/
 !.env.example
 *.pem
 *.key
+
+# Watchlist is per-host runtime state (you edit it on the dashboard). Seeded from
+# tickers.example.yaml on first run; never overwritten by a pull.
+tickers.yaml
 *.pickle
 secrets.yaml
 credentials.json

@@ -7,6 +7,7 @@ import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TICKER_YAML = PROJECT_ROOT / "tickers.yaml"
+TICKER_EXAMPLE = PROJECT_ROOT / "tickers.example.yaml"
 STRATEGY_DIR = PROJECT_ROOT / "stonkslib" / "strategies"
 BACKTEST_DIR = PROJECT_ROOT / "data" / "backtest_results" / "strategy"
 CLEAN_DIR = PROJECT_ROOT / "data" / "ticker_data" / "clean"
@@ -21,6 +22,10 @@ ALERT_CACHE_FILE = PROJECT_ROOT / "data" / "last_alert.json"
 
 
 def load_watchlist() -> dict:
+    # Seed a per-host watchlist from the committed example on first run (tickers.yaml
+    # is gitignored, so a fresh checkout/container won't have one yet).
+    if not TICKER_YAML.exists() and TICKER_EXAMPLE.exists():
+        shutil.copy(TICKER_EXAMPLE, TICKER_YAML)
     with open(TICKER_YAML) as f:
         return yaml.safe_load(f) or {}
 
