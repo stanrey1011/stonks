@@ -2,11 +2,14 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
+import subprocess
+
 import streamlit as st
 
 from stonkslib.dash.common import (
     render_account_metrics, render_positions_table,
     render_options_table, render_orders_table,
+    load_watchlist, save_watchlist, flat_tickers, STONKS_BIN,
 )
 
 
@@ -188,6 +191,34 @@ with tab_overview:
         st.json(dbg.get("raw_activities", {}))
 
 with tab_stocks:
+    # Import Robinhood stock/ETF holdings into the watchlist (crypto + options excluded —
+    # the snapshot already splits those out). Only adds symbols not already tracked.
+    _held = sorted({str(s).upper().strip() for s in stocks["symbol"]
+                    if str(s).strip()}) if (stocks is not None and not stocks.empty
+                                            and "symbol" in stocks.columns) else []
+    _missing = [s for s in _held if s not in set(flat_tickers())]
+    ci1, ci2 = st.columns([3, 1])
+    ci1.caption(
+        f"{len(_held)} stock holding(s) · "
+        + (f"**{len(_missing)}** not yet in your watchlist: {', '.join(_missing)}"
+           if _missing else "all already in your watchlist ✓")
+    )
+    if ci2.button(f"➕ Import {len(_missing)} to watchlist", key="rh_import_stocks",
+                  disabled=not _missing, use_container_width=True):
+        wl = load_watchlist()
+        wl.setdefault("stocks", [])
+        wl["stocks"].extend(s for s in _missing if s not in wl["stocks"])
+        save_watchlist(wl)
+        with st.status(f"Fetching data for {len(_missing)} new ticker(s)…", expanded=True) as imp:
+            for i, t in enumerate(_missing, 1):
+                imp.update(label=f"Fetching {t} ({i}/{len(_missing)})…")
+                subprocess.run([str(STONKS_BIN), "pipeline", t, "--no-analyze"],
+                               capture_output=True, text=True)
+            imp.update(label=f"✓ Imported {len(_missing)} ticker(s)", state="complete", expanded=False)
+        st.cache_data.clear()
+        st.success(f"Added to watchlist (stocks): {', '.join(_missing)}")
+        st.rerun()
+
     render_positions_table(stocks)
 
 with tab_crypto:
