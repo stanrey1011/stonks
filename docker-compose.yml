@@ -11,6 +11,16 @@
 # To later serve from a published image instead of building: uncomment the `image:`
 # lines below (pointing at GHCR) and run `docker compose pull && up -d` — no source clone
 # needed by the installer.
+#
+# ── Toggling functions per host (dev vs prod) ─────────────────────────────────
+# stonks-dash always runs. The scheduled batch jobs (pipeline/alert/optimize) run in
+# stonks-scheduler, which is gated behind the `scheduler` profile so a dev box doesn't
+# duplicate cron side-effects (double API calls, double Discord posts, Ollama load).
+#   Dashboard only (dev, e.g. anton):  docker compose up -d           # no scheduler
+#   Full stack (prod, e.g. .208):      COMPOSE_PROFILES=scheduler in .env, then up -d
+#                                       (or: docker compose --profile scheduler up -d)
+# Other functions are env-var toggles in .env: STONKS_DISCORD_WEBHOOK (alerts on/off),
+# ALPACA_PAPER (paper vs live), OLLAMA_HOST (LLM features).
 services:
 
   stonks-dash:
@@ -41,6 +51,9 @@ services:
     image: stonks:latest
     # image: ghcr.io/stanrey1011/stonks:latest   # ← swap to this once published (drop `build:`)
     container_name: stonks-scheduler
+    # Gated: only starts when the `scheduler` profile is active (COMPOSE_PROFILES=scheduler
+    # in .env, or `--profile scheduler`). Keeps dev boxes from running duplicate cron jobs.
+    profiles: ["scheduler"]
     init: true
     env_file: .env
     environment:

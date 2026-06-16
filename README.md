@@ -242,20 +242,30 @@ push alerts are planned** to augment or replace the webhook.
 
 Scheduled jobs run via systemd (host) or Docker supercronic (container).
 
+In Docker, the scheduled jobs run in the `stonks-scheduler` service, which is gated behind
+the **`scheduler` profile** so a dev box can run the dashboard without duplicating cron jobs.
+
 ```sh
-# Host systemd (Anton)
+# Dashboard only (dev box) — no scheduled jobs
+docker compose up -d
+
+# Full stack (production) — dashboard + scheduler
+COMPOSE_PROFILES=scheduler docker compose up -d      # or set it in .env
+#   equivalently: docker compose --profile scheduler up -d
+
+# Trigger / watch jobs (scheduler must be running)
+docker compose exec stonks-scheduler stonks pipeline AAPL --interval 1d
+docker compose logs stonks-scheduler -f
+
+# Host systemd (alternative to the scheduler container)
 systemctl --user enable stonks-alert.timer
 systemctl --user start stonks-alert.service  # trigger now
 journalctl --user -u stonks-alert -f         # live logs
-
-# Docker
-docker compose -f docker-compose.yml up -d   # prod (baked image)
-docker compose up                            # dev (source live-mounted)
-docker compose exec stonks-scheduler stonks pipeline AAPL --interval 1d
-docker compose logs stonks-scheduler -f
 ```
 
-Alert timer fires every weekday at 20:30 UTC (4:30pm ET). Runs signal scan + LEAP scan, outputs to log.
+The scheduler runs the alert scan every weekday at 20:30 UTC (4:30pm ET) — signal scan +
+LEAP scan, output to log. **Running two instances?** Enable the scheduler on only one of them
+(see the toggle table in the dev notes) to avoid duplicate API calls and alerts.
 
 ---
 
