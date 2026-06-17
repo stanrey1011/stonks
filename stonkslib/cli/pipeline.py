@@ -47,8 +47,11 @@ def run_pipeline(ticker, interval, force=False, analyze=True):
     data_dir = _root / cfg["project"]["ticker_data_dir"]
 
     try:
-        fetch_all(yaml_file=ticker_yaml, data_dir=data_dir, force=force, tickers=[ticker])
-        logger.info(f"[✓] Fetched {ticker}")
+        # Only fetch the interval we're about to clean/analyze — fetching all 8 intervals
+        # per ticker (the fetch_all default) is what triggers Yahoo rate limits on big runs.
+        fetch_all(yaml_file=ticker_yaml, data_dir=data_dir, force=force,
+                  tickers=[ticker], only_intervals=[interval])
+        logger.info(f"[✓] Fetched {ticker} ({interval})")
     except Exception as e:
         logger.error(f"[!] Fetch {ticker}: {e}")
         return False

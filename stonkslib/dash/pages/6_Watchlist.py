@@ -408,21 +408,26 @@ with pc2:
     st.write("")
     pull = st.button("🔄 Pull latest data", use_container_width=True, key="wl_pull")
 if pull:
+    rc = 0
     with st.status("Fetching latest data for the watchlist…", expanded=True) as s:
-        proc = subprocess.Popen(
-            [str(STONKS_BIN), "pipeline", "all", "--no-analyze"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
-        )
         log = st.empty()
         lines = []
-        for raw in proc.stdout:
-            line = raw.rstrip()
-            if line:
-                lines.append(line)
-                log.code("\n".join(lines[-20:]), language="text")
-        proc.wait()
-        if proc.returncode == 0:
-            s.update(label="✓ Data pull complete", state="complete", expanded=False)
+        # 1d + 1wk only (what the dashboard uses); fetch skips already-fresh data.
+        for iv in ("1d", "1wk"):
+            lines.append(f"── interval {iv} ──")
+            proc = subprocess.Popen(
+                [str(STONKS_BIN), "pipeline", "all", "--no-analyze", "--interval", iv],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+            )
+            for raw in proc.stdout:
+                line = raw.rstrip()
+                if line:
+                    lines.append(line)
+                    log.code("\n".join(lines[-20:]), language="text")
+            proc.wait()
+            rc = rc or proc.returncode
+        if rc == 0:
+            s.update(label="✓ Data pull complete (1d + 1wk)", state="complete", expanded=False)
         else:
             s.update(label="✗ Data pull finished with errors (see log)", state="error")
     st.cache_data.clear()

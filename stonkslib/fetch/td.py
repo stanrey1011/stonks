@@ -44,8 +44,16 @@ LOG_DIR = PROJECT_ROOT / config["project"]["log_dir"]
 # Re-setup logging
 logger = setup_logging(LOG_DIR, "fetch.log")
 
-def fetch_all(yaml_file=TICKER_YAML, data_dir=TICKER_RAW_DIR, force=False, tickers=None, category=None):
-    """Fetch stock data and save to ticker-centric directory structure."""
+def fetch_all(yaml_file=TICKER_YAML, data_dir=TICKER_RAW_DIR, force=False, tickers=None,
+              category=None, only_intervals=None):
+    """Fetch stock data and save to ticker-centric directory structure.
+
+    only_intervals: optional iterable of interval strings (e.g. ["1d", "1wk"]) to restrict
+    the fetch to. Default (None) fetches every interval in CATEGORY_INTERVALS — but that's
+    8 Yahoo requests per ticker, so callers that only need one interval (the pipeline) should
+    pass it to avoid rate limits.
+    """
+    only_intervals = set(only_intervals) if only_intervals else None
     yaml_path = Path(yaml_file)
     raw_data_path = Path(data_dir)
     with open(yaml_path, "r") as f:
@@ -69,6 +77,8 @@ def fetch_all(yaml_file=TICKER_YAML, data_dir=TICKER_RAW_DIR, force=False, ticke
             these_tickers = all_tickers.get(cat, [])
         logger.info(f"Loading {cat} tickers: {these_tickers}")
         intervals = CATEGORY_INTERVALS.get(cat, [("1d", "1y")])
+        if only_intervals:
+            intervals = [(i, p) for (i, p) in intervals if str(i) in only_intervals]
 
         for ticker in these_tickers:
             for interval, period in intervals:
