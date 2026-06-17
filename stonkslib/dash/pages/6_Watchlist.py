@@ -376,14 +376,29 @@ else:
 
         selected = event.selection.rows
         if selected:
-            to_remove = [df_cat.iloc[i]["Ticker"] for i in selected]
-            label = f"Remove {', '.join(to_remove)}"
-            if st.button(label, type="secondary", key=f"rm_btn_{cat}"):
+            picked = [df_cat.iloc[i]["Ticker"] for i in selected]
+            mc1, mc2, mc3 = st.columns([1.4, 1.1, 0.8])
+            if mc1.button(f"🗑 Remove {', '.join(picked)}", type="secondary", key=f"rm_btn_{cat}"):
                 wl2 = load_watchlist()
-                for t in to_remove:
+                for t in picked:
                     for c, lst in wl2.items():
                         if lst and t in lst:
                             lst.remove(t)
+                save_watchlist(wl2)
+                st.cache_data.clear()
+                st.rerun()
+            _others = [c for c in VALID_CATEGORIES if c != cat]
+            dest = mc2.selectbox("Move to", _others, key=f"mv_dest_{cat}",
+                                 label_visibility="collapsed")
+            if mc3.button(f"➡ Move", key=f"mv_btn_{cat}", use_container_width=True):
+                wl2 = load_watchlist()
+                wl2.setdefault(dest, [])
+                for t in picked:
+                    for c, lst in wl2.items():
+                        if lst and t in lst:
+                            lst.remove(t)
+                    if t not in wl2[dest]:
+                        wl2[dest].append(t)
                 save_watchlist(wl2)
                 st.cache_data.clear()
                 st.rerun()

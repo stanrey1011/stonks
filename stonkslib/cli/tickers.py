@@ -104,6 +104,28 @@ def remove_ticker(ticker):
     _post_discord(f"**Watchlist update:** `{ticker}` removed\n\n{_watchlist_message(data)}")
 
 
+@tickers.command("move")
+@click.argument("ticker")
+@click.argument("category")
+def move_ticker(ticker, category):
+    """Move a ticker to another category (e.g. stonks tickers move SPY etfs)."""
+    ticker = ticker.upper()
+    data = _load()
+    found = False
+    for cat, items in data.items():
+        if items and ticker in items:
+            items.remove(ticker)
+            found = True
+    if not found:
+        print(f"[!] {ticker} not found in watchlist")
+        return
+    data.setdefault(category, [])
+    if ticker not in data[category]:
+        data[category].append(ticker)
+    _save(data)
+    print(f"[→] Moved {ticker} to {category}")
+
+
 @tickers.command("announce")
 def announce():
     """Post the current watchlist to Discord."""
