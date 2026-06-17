@@ -392,6 +392,44 @@ else:
 
 st.divider()
 
+# ── pull data ───────────────────────────────────────────────────────────────────
+# Fetch+clean (parquet) for the whole watchlist on demand. The nightly scheduler does
+# this automatically; this is for filling in freshly-added tickers without waiting.
+_wl_tickers = [t for items in load_watchlist().values() for t in (items or [])]
+_missing_data = [t for t in _wl_tickers if not (CLEAN_DIR / t / "1d.parquet").exists()]
+pc1, pc2 = st.columns([3, 1])
+pc1.caption(
+    f"{len(_wl_tickers)} tickers · "
+    + (f"**{len(_missing_data)}** missing price data: {', '.join(_missing_data[:15])}"
+       + ("…" if len(_missing_data) > 15 else "") if _missing_data else "all have data ✓")
+    + ".  The nightly scheduler refreshes everything; use this to pull now."
+)
+with pc2:
+    st.write("")
+    pull = st.button("🔄 Pull latest data", use_container_width=True, key="wl_pull")
+if pull:
+    with st.status("Fetching latest data for the watchlist…", expanded=True) as s:
+        proc = subprocess.Popen(
+            [str(STONKS_BIN), "pipeline", "all", "--no-analyze"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+        )
+        log = st.empty()
+        lines = []
+        for raw in proc.stdout:
+            line = raw.rstrip()
+            if line:
+                lines.append(line)
+                log.code("\n".join(lines[-20:]), language="text")
+        proc.wait()
+        if proc.returncode == 0:
+            s.update(label="✓ Data pull complete", state="complete", expanded=False)
+        else:
+            s.update(label="✗ Data pull finished with errors (see log)", state="error")
+    st.cache_data.clear()
+    st.rerun()
+
+st.divider()
+
 # ── add ticker ────────────────────────────────────────────────────────────────
 
 st.subheader("Add Ticker")

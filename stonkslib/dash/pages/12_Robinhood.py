@@ -2,14 +2,12 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-import subprocess
-
 import streamlit as st
 
 from stonkslib.dash.common import (
     render_account_metrics, render_positions_table,
     render_options_table, render_orders_table,
-    load_watchlist, save_watchlist, flat_tickers, STONKS_BIN,
+    load_watchlist, save_watchlist, flat_tickers,
 )
 
 
@@ -205,19 +203,19 @@ with tab_stocks:
     )
     if ci2.button(f"➕ Import {len(_missing)} to watchlist", key="rh_import_stocks",
                   disabled=not _missing, use_container_width=True):
+        # Add the symbols only — fetching price data for a large batch inline is slow and
+        # unreliable. Use the Watchlist page's "Pull latest data" button (or wait for the
+        # nightly scheduler) to fetch their data.
         wl = load_watchlist()
         wl.setdefault("stocks", [])
         wl["stocks"].extend(s for s in _missing if s not in wl["stocks"])
         save_watchlist(wl)
-        with st.status(f"Fetching data for {len(_missing)} new ticker(s)…", expanded=True) as imp:
-            for i, t in enumerate(_missing, 1):
-                imp.update(label=f"Fetching {t} ({i}/{len(_missing)})…")
-                subprocess.run([str(STONKS_BIN), "pipeline", t, "--no-analyze"],
-                               capture_output=True, text=True)
-            imp.update(label=f"✓ Imported {len(_missing)} ticker(s)", state="complete", expanded=False)
         st.cache_data.clear()
-        st.success(f"Added to watchlist (stocks): {', '.join(_missing)}")
-        st.rerun()
+        st.success(
+            f"Added {len(_missing)} ticker(s) to your watchlist: {', '.join(_missing)}.  "
+            "Go to **Watchlist → 🔄 Pull latest data** to fetch their price data "
+            "(or the nightly refresh will do it automatically)."
+        )
 
     render_positions_table(stocks)
 
