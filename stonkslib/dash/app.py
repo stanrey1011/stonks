@@ -19,6 +19,9 @@ pg = st.navigation({
         st.Page(_PAGES_DIR / "3_Signals.py",      title="Signals",     icon="🔔"),
         st.Page(_PAGES_DIR / "13_Markov.py",      title="Markov",      icon="🔮"),
     ],
+    "Agents": [
+        st.Page(_PAGES_DIR / "14_Analyst.py",     title="Analyst",     icon="🧠"),
+    ],
     "Portfolio": [
         st.Page(_PAGES_DIR / "8_Alpaca.py",       title="Alpaca",      icon="🦙"),
         st.Page(_PAGES_DIR / "12_Robinhood.py",   title="Robinhood",   icon="🪶"),
