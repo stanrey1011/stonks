@@ -122,10 +122,29 @@ def _load_llm_sentiment(ticker: str) -> list[dict]:
     return load_sentiment_rows(ticker, limit=30)
 
 
+st.subheader("LLM sentiment (1–10)")
+st.caption("Local-LLM daily score + stock-relevant summary. Seed below, or via "
+           "`stonks news-backfill` + `stonks sentiment-score`.")
+
+# ── seed control: backfill + score this ticker from the GUI ───────────────────
+sc1, sc2 = st.columns([1, 3])
+with sc1:
+    seed_days = st.selectbox("Backfill days", [14, 30, 90, 365], index=1, key="news_seed_days")
+with sc2:
+    st.write("")
+    if st.button(f"⚡ Seed {ticker} — backfill + score", key="news_seed_btn"):
+        from stonkslib.utils import news_store
+        from stonkslib.sentiment import scorer
+        with st.spinner(f"Fetching {seed_days}d of {ticker} news from Finnhub…"):
+            n_art = news_store.backfill(ticker, days=int(seed_days))
+        with st.spinner(f"Scoring unscored {ticker} days with the local LLM… (may take a minute)"):
+            n_scored = scorer.score_ticker(ticker, verbose=False)
+        st.success(f"{ticker}: {n_art} articles archived · {n_scored} new day(s) scored.")
+        _load_llm_sentiment.clear()
+        st.rerun()
+
 llm_rows = _load_llm_sentiment(ticker)
 if llm_rows:
-    st.subheader("LLM sentiment (1–10)")
-    st.caption("Local-LLM daily score + stock-relevant summary, from `stonks sentiment-score`.")
     for r in llm_rows:
         score = r.get("score")
         score_s = f"{score:.0f}/10" if score is not None else "—"
@@ -134,7 +153,9 @@ if llm_rows:
                 st.markdown(r["summary"])
             if r.get("reasoning"):
                 st.caption(f"Why: {r['reasoning']}")
-    st.divider()
+else:
+    st.info(f"No LLM sentiment scored for **{ticker}** yet — click **⚡ Seed {ticker}** above.")
+st.divider()
 
 
 # ── article feed ─────────────────────────────────────────────────────────────
