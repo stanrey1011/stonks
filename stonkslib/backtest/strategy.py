@@ -64,6 +64,9 @@ def run_strategy_backtest(ticker, interval, strategy, output_dir=None, df_overri
         _lookback = {"1wk": 260, "1d": 756, "1h": 504}.get(interval, 252)
         df = df.iloc[-_lookback:]
 
+    # Re-assert ticker after slicing/override so ticker-aware indicators resolve it.
+    df.attrs["ticker"] = ticker
+
     ind = strategy.get("indicators", {})
     risk = strategy.get("risk", {})
     cash = float(start_cash_override if start_cash_override is not None else risk.get("start_cash", 10000))

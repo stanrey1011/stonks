@@ -23,7 +23,6 @@ dependencies = [
     "requests",
     "scipy",
     "streamlit",
-    "ollama",
     "alpaca-py",
     "python-dotenv",
 ]

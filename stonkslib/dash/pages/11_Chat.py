@@ -1,7 +1,5 @@
 import os
 import sys
-import json
-import requests
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -13,8 +11,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 from stonkslib.dash.common import load_watchlist, flat_tickers, load_alert_cache
-
-OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+from stonkslib.llm import client
 
 SYSTEM_PROMPT = """\
 You are Stonks Assistant — a sharp, data-driven trading analyst with full access to the user's \
@@ -37,15 +34,10 @@ QUICK_PROMPTS = [
     "Which tickers look good for LEAPs?",
 ]
 
-# ── Ollama helpers ─────────────────────────────────────────────────────────────
+# ── LLM helpers ──────────────────────────────────────────────────────────────
 
 def get_available_models() -> list[str]:
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
-        r.raise_for_status()
-        return [m["name"] for m in r.json().get("models", [])]
-    except Exception:
-        return []
+    return client.list_models()
 
 
 def build_context() -> str:
@@ -107,26 +99,8 @@ def build_context() -> str:
 
 
 def ask_stream(messages: list[dict], model: str):
-    payload = {"model": model, "messages": messages, "stream": True}
     try:
-        with requests.post(
-            f"{OLLAMA_URL}/api/chat",
-            json=payload,
-            stream=True,
-            timeout=300,
-        ) as resp:
-            resp.raise_for_status()
-            for line in resp.iter_lines():
-                if not line:
-                    continue
-                chunk = json.loads(line)
-                content = chunk.get("message", {}).get("content", "")
-                if content:
-                    yield content
-                if chunk.get("done"):
-                    break
-    except requests.exceptions.Timeout:
-        yield "\n\n[Response timed out — try a shorter question or a smaller model.]"
+        yield from client.chat_stream(messages, model=model)
     except Exception as e:
         yield f"\n\n[Error: {e}]"
 
@@ -135,7 +109,7 @@ def ask_stream(messages: list[dict], model: str):
 
 st.set_page_config(page_title="Chat — Stonks", layout="wide")
 st.title("Stonks Assistant")
-st.caption("Ask anything about your watchlist, signals, or trade setups. Powered by Ollama.")
+st.caption("Ask anything about your watchlist, signals, or trade setups. Powered by your local LLM.")
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
@@ -143,16 +117,17 @@ with st.sidebar:
     st.subheader("Model")
     models = get_available_models()
     if models:
+        _default = client.default_model()
         selected_model = st.selectbox(
-            "Ollama model",
+            "Model",
             models,
-            index=models.index("qwen2.5:7b") if "qwen2.5:7b" in models else 0,
+            index=models.index(_default) if _default in models else 0,
             key="chat_model",
             label_visibility="collapsed",
         )
     else:
-        st.warning("Ollama not running.\nStart with `ollama serve`.")
-        selected_model = "qwen2.5:7b"
+        st.warning(f"LLM server not reachable at {client.base_url()}.")
+        selected_model = client.default_model()
 
     st.divider()
 
@@ -192,7 +167,7 @@ user_input = st.chat_input("Ask about your watchlist, signals, or trade setups�
 
 if user_input:
     if not models:
-        st.error("Ollama is not running. Start it with `ollama serve` and refresh.")
+        st.error(f"LLM server not reachable at {client.base_url()}. Check it's running and refresh.")
         st.stop()
 
     # Show user message

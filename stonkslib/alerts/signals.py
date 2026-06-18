@@ -108,6 +108,8 @@ def check_signals(ticker, interval, strategy, min_signals: int = 1,
 
     # Need enough bars for indicator warmup — use last 100
     df = df.tail(100).copy()
+    # Re-assert ticker after slicing so ticker-aware indicators resolve it.
+    df.attrs["ticker"] = ticker
 
     # v2 strategies build their signals from the expression engine further down;
     # skip the hardcoded per-indicator compute below (it stays for legacy strategies).

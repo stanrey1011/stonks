@@ -30,6 +30,9 @@ def load_td(tickers: list[str], interval: str, base_dir: Path = DEFAULT_CLEAN_DI
             df = pd.read_parquet(file_path)
             df.columns = df.columns.str.title()
             df = df.sort_index()
+            # Tag the frame with its ticker so ticker-aware indicators (e.g.
+            # news_sentiment) can resolve it; build_namespace's df.copy() keeps attrs.
+            df.attrs["ticker"] = ticker
             data[ticker] = df
         except Exception as e:
             print(f"[!] Failed to load {file_path}: {e}")

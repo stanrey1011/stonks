@@ -30,6 +30,7 @@ from stonkslib.indicators.moving_avg_double import moving_averages as _ma_double
 from stonkslib.indicators.supertrend import supertrend as _supertrend
 from stonkslib.indicators.rsi_divergence import rsi_divergence as _rsi_div
 from stonkslib.indicators.markov import markov_signals as _markov
+from stonkslib.indicators.news_sentiment import news_sentiment as _news_sentiment
 
 
 INDICATORS = {
@@ -92,6 +93,17 @@ INDICATORS = {
         "outputs": {"mk_state": "state", "mk_bull": "bull_prob", "mk_bear": "bear_prob"},
         "vote_buy": "mk_bull > 0.6",
         "vote_sell": "mk_bear > 0.6",
+    },
+    "news_sentiment": {
+        # LLM-scored daily news sentiment (1-10), precomputed by sentiment.scorer and
+        # read from the news store — never calls the LLM at compute time. Needs the
+        # ticker, which it reads from df.attrs (set in utils/load_td.load_td).
+        "fn": _news_sentiment,
+        "needs": ["Close"],
+        "params": {"lookback": ("lookback", 1), "shift": ("shift", 1)},
+        "outputs": {"news_sent": None},
+        "vote_buy": "news_sent > 6",
+        "vote_sell": "news_sent < 4",
     },
 }
 

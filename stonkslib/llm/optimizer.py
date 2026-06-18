@@ -7,6 +7,7 @@ from pathlib import Path
 from stonkslib.backtest.strategy import run_strategy_backtest, load_strategy
 from stonkslib.backtest.leaps import run_leaps_backtest
 from stonkslib.strategies.engine import is_v2
+from stonkslib.llm import client
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 OPTIMIZED_DIR = PROJECT_ROOT / "stonkslib" / "strategies" / "optimized"
@@ -180,12 +181,6 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
                 second-pass refinement (e.g. 7b exploration → 32b refinement).
     use_leaps:  score against the LEAP backtest; output files get a _leaps_{option_type} suffix.
     """
-    try:
-        import ollama
-    except ImportError:
-        logger.error("[!] ollama package not installed")
-        return None
-
     strategy_path = Path(strategy_path)
 
     # Resolve warm-start: load from existing optimized YAML if available
@@ -256,23 +251,20 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
         prompt = (_build_leaps_prompt(best_strategy, metrics_list, option_type)
                   if use_leaps else _build_prompt(best_strategy, metrics_list))
         try:
-            response = ollama.chat(
-                model=model,
+            content = client.chat(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
                 ],
-                format="json"
+                model=model,
+                json_mode=True,
             )
-            suggestions = json.loads(response.message.content)
+            suggestions = json.loads(content)
             logger.info(f"    LLM: {suggestions.get('reasoning', '')}")
             # Apply suggestions to a fresh copy of best — never mutate best_strategy itself
             next_strategy = _apply_suggestions(copy.deepcopy(best_strategy), suggestions)
-        except ConnectionError:
-            logger.error("[!] Ollama not running — start with: ollama serve")
-            break
         except Exception as e:
-            logger.error(f"[!] LLM error: {e}")
+            logger.error(f"[!] LLM error: {e} (LLM reachable at {client.base_url()}?)")
             break
 
     OPTIMIZED_DIR.mkdir(parents=True, exist_ok=True)

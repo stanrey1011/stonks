@@ -65,7 +65,7 @@ def _print_summary(results):
 @click.option("--iterations", default=5, show_default=True,
               help="Number of LLM optimization iterations per strategy")
 @click.option("--model", default="qwen2.5:7b", show_default=True,
-              help="Ollama model to use")
+              help="LLM model to use")
 @click.option("--leaps", "use_leaps", is_flag=True,
               help="Score against the LEAP backtest (Black-Scholes pricing) instead of equity. "
                    "Saves separate _leaps_{type}_optimized.yaml files.")

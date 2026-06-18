@@ -1,12 +1,14 @@
 """
 LLM-based signal interpretation.
 
-Takes rule-based signals + recent indicator readings and asks an Ollama model
+Takes rule-based signals + recent indicator readings and asks an LLM
 to assess conviction level and provide plain-English reasoning.
 """
 import json
 import logging
 import pandas as pd
+
+from stonkslib.llm import client
 
 logger = logging.getLogger(__name__)
 
@@ -98,12 +100,6 @@ def interpret_signal(
     if not signals:
         return fallback
 
-    try:
-        import ollama
-    except ImportError:
-        logger.warning("[interpreter] ollama not installed")
-        return fallback
-
     signal_summary = "\n".join(
         f"  [{s['type']}] {s['reason']}" for s in signals
     )
@@ -117,23 +113,20 @@ def interpret_signal(
     )
 
     try:
-        response = ollama.chat(
-            model=model,
+        content = client.chat(
             messages=[
                 {"role": "system", "content": _SYSTEM},
                 {"role": "user",   "content": prompt},
             ],
-            format="json",
+            model=model,
+            json_mode=True,
         )
-        result = json.loads(response.message.content)
+        result = json.loads(content)
         return {
             "direction":  result.get("direction",  "unknown"),
             "conviction": result.get("conviction", "none"),
             "reasoning":  result.get("reasoning",  ""),
         }
-    except ConnectionError:
-        logger.error("[interpreter] Ollama not running — start with: ollama serve")
-        return fallback
     except Exception as e:
-        logger.error(f"[interpreter] LLM error: {e}")
+        logger.error(f"[interpreter] LLM error: {e} (LLM reachable at {client.base_url()}?)")
         return fallback

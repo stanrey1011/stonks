@@ -15,12 +15,13 @@
 # ── Toggling functions per host (dev vs prod) ─────────────────────────────────
 # stonks-dash always runs. The scheduled batch jobs (pipeline/alert/optimize) run in
 # stonks-scheduler, which is gated behind the `scheduler` profile so a dev box doesn't
-# duplicate cron side-effects (double API calls, double Discord posts, Ollama load).
+# duplicate cron side-effects (double API calls, double Discord posts, LLM load).
 #   Dashboard only (dev, e.g. anton):  docker compose up -d           # no scheduler
 #   Full stack (prod, e.g. .208):      COMPOSE_PROFILES=scheduler in .env, then up -d
 #                                       (or: docker compose --profile scheduler up -d)
 # Other functions are env-var toggles in .env: STONKS_DISCORD_WEBHOOK (alerts on/off),
-# ALPACA_PAPER (paper vs live), OLLAMA_HOST (LLM features).
+# ALPACA_PAPER (paper vs live), LLM_BASE_URL (OpenAI-compatible LLM endpoint, e.g.
+# llama.cpp at http://10.11.87.91:8089/v1; falls back to OLLAMA_HOST + /v1 if unset).
 services:
 
   stonks-dash:

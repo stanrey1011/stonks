@@ -16,6 +16,8 @@ from stonkslib.cli.leaps import leaps
 from stonkslib.cli.leaps_backtest import leaps_backtest
 from stonkslib.cli.leaps_trades import leaps_trades
 from stonkslib.cli.earnings_refresh import earnings_refresh
+from stonkslib.cli.news_backfill import news_backfill
+from stonkslib.cli.sentiment import sentiment_score
 
 
 @click.group()
@@ -38,6 +40,8 @@ cli.add_command(leaps)
 cli.add_command(leaps_backtest)
 cli.add_command(leaps_trades)
 cli.add_command(earnings_refresh)
+cli.add_command(news_backfill)
+cli.add_command(sentiment_score)
 
 if __name__ == "__main__":
     cli(auto_envvar_prefix="STONKS", standalone_mode=True)

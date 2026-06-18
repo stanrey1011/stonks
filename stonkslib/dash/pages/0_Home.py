@@ -50,16 +50,13 @@ def _check_finnhub() -> tuple[bool, str]:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _check_ollama() -> tuple[bool, str]:
+def _check_llm() -> tuple[bool, str]:
     try:
-        import requests
-        base = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-        r = requests.get(f"{base}/api/tags", timeout=3)
-        if r.status_code == 200:
-            models = [m["name"] for m in r.json().get("models", [])]
-            label = f"{len(models)} model{'s' if len(models) != 1 else ''} loaded"
-            return True, label
-        return False, f"HTTP {r.status_code}"
+        from stonkslib.llm import client
+        models = client.list_models()
+        if models:
+            return True, f"{len(models)} model{'s' if len(models) != 1 else ''} available"
+        return False, "No models / unreachable"
     except Exception:
         return False, "Not running or unreachable"
 
@@ -160,8 +157,8 @@ with col_yf:
     _status_badge(ok, msg, "yfinance")
 
 with col_ol:
-    ok, msg = _check_ollama()
-    _status_badge(ok, msg, "Ollama")
+    ok, msg = _check_llm()
+    _status_badge(ok, msg, "LLM")
 
 with col_ap:
     ok, msg = _check_alpaca_paper()
@@ -310,7 +307,7 @@ pages = [
     ("📋", "Trades",     "Trading",  "Drill into individual entry/exit trades from a saved backtest."),
     ("⭐", "Watchlist",  "Configuration", "Add or remove tickers. Automatically fetches data for new ones."),
     ("⚙️", "Pipeline",  "Configuration", "Re-fetch data, run alert scans with full options, or run the strategy optimizer."),
-    ("💬", "Chat",      "AI", "Ask the Stonks Assistant anything — signals, setups, LEAP ideas. Powered by Ollama."),
+    ("💬", "Chat",      "AI", "Ask the Stonks Assistant anything — signals, setups, LEAP ideas. Powered by your local LLM."),
 ]
 
 for icon, title, section, desc in pages:

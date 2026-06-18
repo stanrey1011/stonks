@@ -114,6 +114,29 @@ if bull is not None or buzz is not None:
     st.divider()
 
 
+# ── LLM sentiment scores (1-10) ───────────────────────────────────────────────
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _load_llm_sentiment(ticker: str) -> list[dict]:
+    from stonkslib.utils.news_store import load_sentiment_rows
+    return load_sentiment_rows(ticker, limit=30)
+
+
+llm_rows = _load_llm_sentiment(ticker)
+if llm_rows:
+    st.subheader("LLM sentiment (1–10)")
+    st.caption("Local-LLM daily score + stock-relevant summary, from `stonks sentiment-score`.")
+    for r in llm_rows:
+        score = r.get("score")
+        score_s = f"{score:.0f}/10" if score is not None else "—"
+        with st.expander(f"**{r.get('date','')}**  ·  {score_s}  ·  {r.get('n_articles', 0)} articles"):
+            if r.get("summary"):
+                st.markdown(r["summary"])
+            if r.get("reasoning"):
+                st.caption(f"Why: {r['reasoning']}")
+    st.divider()
+
+
 # ── article feed ─────────────────────────────────────────────────────────────
 
 if not articles:

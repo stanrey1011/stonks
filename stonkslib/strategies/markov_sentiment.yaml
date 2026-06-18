@@ -1,0 +1,39 @@
+name: "Markov + News Sentiment"
+description: >
+  Markov regime probability and LLM news sentiment (1-10) as two INDEPENDENT
+  confluence votes — neither drives the other. An entry is proposed when either
+  votes bullish, but only fires when the combined weighted BUY score clears
+  confluence.min_score. News sentiment is precomputed by `stonks sentiment-score`
+  and read from the news store, so backtests stay deterministic.
+
+indicators:
+  markov:
+    params:
+      states: 3
+      lookback: 60
+    # Override the registry default vote (mk_bull > 0.6 sits at the Markov ceiling).
+    vote_buy: "mk_bull > 0.5"
+    vote_sell: "mk_bear > 0.5"
+  news_sentiment:
+    params:
+      lookback: 3    # a day's score carries forward up to 3 calendar days
+      shift: 1       # a bar never sees its own same-day news (no look-ahead)
+    # vote_buy/vote_sell use registry defaults: news_sent > 6 / news_sent < 4
+
+entry: "mk_bull > 0.5 or news_sent > 6"
+exit: "mk_bear > 0.5 or news_sent < 4"
+
+risk:
+  start_cash: 10000
+  risk_per_trade: 0.2
+  stop_loss_pct: 0.08
+  slippage: 0.0005
+
+# Independent weighted votes. With min_score 1.5: sentiment alone (1.5) clears the
+# gate, Markov alone (1.0) does not, and the two together (2.5) clear it comfortably —
+# so the gate rewards agreement without hard-coupling the indicators.
+confluence:
+  min_score: 1.5
+  weights:
+    markov: 1.0
+    news_sentiment: 1.5

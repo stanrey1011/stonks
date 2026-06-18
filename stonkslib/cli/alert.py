@@ -89,7 +89,7 @@ def _print_signals(all_signals):
 @click.option("--llm-interpret", "llm_interpret", is_flag=True,
               help="Use LLM to assess conviction and add plain-English reasoning to each signal")
 @click.option("--llm-model", "llm_model", default="qwen2.5:7b", show_default=True,
-              help="Ollama model for signal interpretation")
+              help="LLM model for signal interpretation")
 def alert(target, strategy, all_strategies, every_strategy, interval, min_signals, min_score,
           confirm_weekly, llm_interpret, llm_model):
     """Scan latest bar for entry/exit signals. Auto-uses optimized strategies when available.

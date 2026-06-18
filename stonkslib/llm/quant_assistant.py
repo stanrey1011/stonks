@@ -1,19 +1,19 @@
 # stonkslib/llm/quant_assistant.py
 
-import ollama
 import os
 
-MODEL = "llama3"  # Or 'deepseek-coder', 'mistral', etc.
+from stonkslib.llm import client
+
+MODEL = None  # None → use client.default_model() (env LLM_MODEL)
 STRATEGY_DIR = "stonkslib/strategies"
 
 def ask_llm(prompt, model=MODEL, system=None):
-    """Send a prompt to your local Ollama model."""
+    """Send a prompt to the local OpenAI-compatible LLM server."""
     messages = []
     if system:
         messages.append({'role': 'system', 'content': system})
     messages.append({'role': 'user', 'content': prompt})
-    response = ollama.chat(model=model, messages=messages)
-    return response['message']['content']
+    return client.chat(messages=messages, model=model)
 
 def generate_strategy_yaml(strategy_idea):
     prompt = f"Write a YAML strategy config for this quant trading idea:\n{strategy_idea}\n" \
@@ -43,7 +43,7 @@ def get_save_path(filename):
     return filename
 
 if __name__ == "__main__":
-    print("=== Quant LLM Assistant (Ollama) ===")
+    print("=== Quant LLM Assistant (llama.cpp) ===")
     print("1. Generate new strategy YAML")
     print("2. Edit existing strategy YAML")
     print("3. Summarize backtest results")

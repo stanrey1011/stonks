@@ -13,10 +13,17 @@ from stonkslib.dash.common import (
     load_watchlist, flat_tickers,
     CLEAN_DIR, STONKS_BIN, STRATEGY_DIR, VALID_CATEGORIES,
 )
+from stonkslib.llm import client
+
+
+def _llm_models() -> list[str]:
+    """Models the LLM server reports, with a sane fallback if unreachable."""
+    return client.list_models() or [client.default_model()]
+
 
 st.set_page_config(page_title="Pipeline — Stonks", layout="wide")
 st.title("Pipeline & Operations")
-st.caption("Three tabs: Data shows how fresh each ticker's price data is and lets you re-fetch it. Alerts runs a signal scan on demand with confluence filtering and optional LLM conviction scoring. Optimize uses a local AI model (Ollama) to tune strategy parameters — requires Ollama to be running.")
+st.caption("Three tabs: Data shows how fresh each ticker's price data is and lets you re-fetch it. Alerts runs a signal scan on demand with confluence filtering and optional LLM conviction scoring. Optimize uses a local AI model to tune strategy parameters — requires the LLM server to be running.")
 
 wl = load_watchlist()
 tickers = flat_tickers(wl)
@@ -197,11 +204,11 @@ with tab_alerts:
         llm_interpret = st.checkbox(
             "LLM conviction scoring",
             value=False,
-            help="Ask Ollama to assess each signal and add plain-English reasoning. Requires Ollama running.",
+            help="Ask the local llama.cpp model to assess each signal and add plain-English reasoning. Requires the LLM server running.",
         )
     with c7:
         llm_model_alert = st.selectbox(
-            "Ollama model", ["qwen2.5:7b", "qwen2.5:32b", "gemma3:27b"],
+            "Model", _llm_models(),
             key="alert_llm_model",
             disabled=not llm_interpret,
         )
@@ -253,8 +260,8 @@ with tab_alerts:
 with tab_optimize:
     st.subheader("Strategy Optimizer")
     st.caption(
-        "Uses an Ollama LLM to iteratively tune strategy parameters. "
-        "Ollama must be running. This can take several minutes."
+        "Uses the local llama.cpp LLM to iteratively tune strategy parameters. "
+        "The LLM server must be running. This can take several minutes."
     )
 
     c1, c2 = st.columns(2)
@@ -276,7 +283,7 @@ with tab_optimize:
     with c4:
         opt_iterations = st.number_input("Iterations", min_value=1, max_value=20, value=3, step=1)
     with c5:
-        opt_model = st.selectbox("Ollama model", ["qwen2.5:7b", "qwen2.5:32b", "gemma3:27b"])
+        opt_model = st.selectbox("Model", _llm_models())
 
     c6, c7 = st.columns(2)
     with c6:

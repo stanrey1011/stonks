@@ -230,7 +230,7 @@ class Tools:
 
     def optimize_ticker(self, ticker: str, interval: str = "", iterations: int = 3) -> str:
         """
-        Optimize all strategy parameters for a ticker using the local LLM (Ollama).
+        Optimize all strategy parameters for a ticker using the local LLM (llama.cpp).
         ticker: symbol like AAPL
         interval: 1d (default) or 1wk
         iterations: number of optimization rounds (default 3, max 5)
@@ -257,7 +257,7 @@ class Tools:
                 results.append((strat_name, avg_pnl, avg_win))
 
         if not results:
-            return "Optimization failed — is Ollama running? Start with: ollama serve"
+            return "Optimization failed — is the llama.cpp LLM server running?"
 
         results.sort(key=lambda r: r[1], reverse=True)
         lines = [f"Optimization complete — {ticker} ({interval}):"]
@@ -969,7 +969,7 @@ class Tools:
             return f"LEAP optimization error: {e}"
 
         if not results:
-            return "Optimization failed — is Ollama running? Start with: ollama serve"
+            return "Optimization failed — is the llama.cpp LLM server running?"
 
         results.sort(key=lambda r: r[1], reverse=True)
         lines = [f"LEAP Optimization complete — {ticker} ({option_type.upper()}, {interval}):"]
