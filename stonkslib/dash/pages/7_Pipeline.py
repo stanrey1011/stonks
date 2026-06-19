@@ -25,6 +25,42 @@ st.set_page_config(page_title="Pipeline — Stonks", layout="wide")
 st.title("Pipeline & Operations")
 st.caption("Three tabs: Data shows how fresh each ticker's price data is and lets you re-fetch it. Alerts runs a signal scan on demand with confluence filtering and optional LLM conviction scoring. Optimize uses a local AI model to tune strategy parameters — requires the LLM server to be running.")
 
+# ── running jobs: cancel long LLM jobs launched from the GUI ───────────────────
+from stonkslib.utils import jobs as _jobs
+
+_running = _jobs.list_jobs()
+_n_llm = sum(1 for j in _running if j["llm"])
+_exp_label = f"🧹 Running jobs — {len(_running)} active" if _running else "🧹 Running jobs"
+with st.expander(_exp_label, expanded=bool(_running)):
+    st.caption("Jobs launched here (optimize, pipeline, scoring) keep running after you "
+               "navigate away — repeated clicks stack up and all fight over the LLM. Cancel "
+               "them here. The nightly **scheduler** runs in a separate container and isn't shown.")
+    cc1, cc2, _ = st.columns([1, 2, 4])
+    if cc1.button("🔄 Refresh", key="jobs_refresh"):
+        st.rerun()
+    if cc2.button(f"🛑 Cancel all LLM jobs ({_n_llm})", key="jobs_cancel_llm",
+                  disabled=_n_llm == 0):
+        killed = _jobs.cancel_all(llm_only=True)
+        st.success(f"Cancelled {killed} LLM job(s).")
+        st.rerun()
+    if not _running:
+        st.info("No stonks jobs running in this container.")
+    else:
+        for j in _running:
+            jc1, jc2 = st.columns([6, 1])
+            tag = "🧠 " if j["llm"] else "⚙️ "
+            jc1.markdown(
+                f"{tag}**{j['kind']}** · PID {j['pid']} · running {_jobs.format_elapsed(j['elapsed'])}  \n"
+                f"`{j['cmd'][:120]}`"
+            )
+            if jc2.button("✖ Cancel", key=f"cancel_job_{j['pid']}"):
+                ok = _jobs.kill_job(j["pid"])
+                st.success(f"Cancelled PID {j['pid']}." if ok
+                           else f"Could not cancel PID {j['pid']} (already gone?).")
+                st.rerun()
+
+st.divider()
+
 wl = load_watchlist()
 tickers = flat_tickers(wl)
 
