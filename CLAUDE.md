@@ -12,6 +12,19 @@ pip install -r requirements.txt
 
 The `stonks` CLI is installed as a package entry point. All commands require the venv to be active.
 
+## Develop docker-native (deploy target is .208)
+
+**Develop on anton as if the code is going straight to Docker on prod (.208), so it's
+push-ready with no extra steps.** Concretely:
+- Don't assume a host user session — the dashboard and scheduler run **inside containers**
+  on both anton (dev) and .208 (prod). No `systemctl --user`, no host cron, no host-only
+  paths. Background work = detached subprocess; recurring work = a `docker/crontab` line run
+  by supercronic in the `stonks-scheduler` container.
+- Persist user/runtime state under `data/` (a gitignored Docker volume) so it survives
+  `git pull` and never diverges from git. Never write state into git-tracked files on prod.
+- Deploy flow (`DEPLOY.md`): edit+test on anton → `git push` → on .208 `git pull && docker
+  compose up -d`. `.208` is **pull-only**; never edit/rsync files directly on prod.
+
 ## Common Commands
 
 ```sh
@@ -110,12 +123,16 @@ fetch (yfinance → raw CSV)
 | `data/ticker_data/earnings/{ticker}.json` | Earnings cache: history + next date (24h TTL) |
 | `data/ticker_data/news/{ticker}.json` | News cache: articles + sentiment (4h TTL) |
 | `data/last_alert.json` | Last Alerts scan result — persists signal badges on Watchlist across browser refreshes |
+| `data/optimize_schedules.json` | Dashboard-defined optimize schedules; dispatched by `stonks scheduler-tick` |
 
 All data directories are gitignored.
 
 ### Key modules
 
 - **`stonkslib/cli/main.py`** — Click group wiring all subcommands
+- **`stonkslib/snapshot.py`** — `hydrate(ticker)`: the unified data spine. One `TickerSnapshot` (price, live-engine confluence, swing+LEAP edge, fundamentals, dividends, earnings, sentiment, news, short interest, per-source freshness) that every consumer reads instead of the ~7 data dirs. Confluence degrades gracefully if an indicator's infra is down. Full field contract in `docs/snapshot-schema.md`.
+- **`stonkslib/agents/`** — multi-agent hedge fund. `base.py` (scalable `Agent` + `register()` registry, ordered `STAGES`), `roles/` (fundamental/technical analysts, bull/bear researchers, portfolio manager — one Hermes model via `LLM_MODEL`, per-role prompts), `orchestrator.py` (`run_fund()` runs the staged chain; PM verdict bucketed LEAP/DCA/Swing), `analyst.py` (thin view over `hydrate()`). CLI: `stonks agents <ticker|all>`.
+- **`stonkslib/utils/scheduler.py`** — docker-native optimize scheduler: detached `run_detached()` (run-now), JSON schedule store in `data/`, and `tick()` (launches due schedules) called by `stonks scheduler-tick` every minute via supercronic. No systemd.
 - **`stonkslib/fetch/td.py`** — `fetch_all()`: yfinance download, freshness guard via `fetch/guard.py`
 - **`stonkslib/clean/td.py`** — `clean_td()`: normalizes raw CSVs to Parquet
 - **`stonkslib/analysis/signals.py`** — `aggregate_and_save()`: runs every indicator and pattern detector, writes CSVs to `data/analysis/signals/`
@@ -178,7 +195,10 @@ section key drive the sidebar. Pages under `stonkslib/dash/pages/`:
 | Alpaca | `8_Alpaca.py` | Live Alpaca account — equity curve, positions, orders, watchlist sync; paper/live toggle |
 | Robinhood | `12_Robinhood.py` | Live Robinhood account (read-only) — equity, positions, orders via the SnapTrade aggregator; shows a connect link until linked |
 | Pipeline | `7_Pipeline.py` | Trigger fetch/clean/analyze from the UI |
+| Scheduler | `16_Scheduler.py` | Run optimize as a detached background job + define recurring optimize schedules (JSON store, dispatched by `stonks scheduler-tick`) |
 | News | `10_News.py` | Finnhub headlines + sentiment per ticker; cached 4h; requires FINNHUB_API_KEY |
+| Hedge-Fund Desk | `15_Agents.py` | Multi-agent fund: facts (snapshot) left, reasoning chain (analysts → bull/bear → PM) right, per-vehicle verdict (LEAP/DCA/Swing) bottom |
+| Analyst | `14_Analyst.py` | One-screen analyst brief; thin view over `snapshot.hydrate()` |
 
 Key dashboard patterns:
 - `@st.cache_data(ttl=3600)` on all data-loading functions; indicator functions take `(ticker, interval, *params)` as hashable cache keys, never DataFrames

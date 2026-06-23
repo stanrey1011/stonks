@@ -20,6 +20,7 @@ pg = st.navigation({
         st.Page(_PAGES_DIR / "13_Markov.py",      title="Markov",      icon="🔮"),
     ],
     "Agents": [
+        st.Page(_PAGES_DIR / "15_Agents.py",      title="Hedge-Fund Desk", icon="🏦"),
         st.Page(_PAGES_DIR / "14_Analyst.py",     title="Analyst",     icon="🧠"),
     ],
     "Portfolio": [
@@ -33,6 +34,7 @@ pg = st.navigation({
     ],
     "Configuration": [
         st.Page(_PAGES_DIR / "7_Pipeline.py",     title="Pipeline",    icon="⚙️"),
+        st.Page(_PAGES_DIR / "16_Scheduler.py",   title="Scheduler",   icon="🗓️"),
     ],
     "AI": [
         st.Page(_PAGES_DIR / "11_Chat.py",        title="Chat",        icon="💬"),

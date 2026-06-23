@@ -7,9 +7,14 @@
 # Alert scan: signals + LEAPs → log (Mon-Fri 20:30 UTC, after pipeline)
 30 20 * * 1-5 stonks alert all --all-strategies --interval 1d --min-signals 2 --confirm-weekly >> /app/log/alert.log 2>&1 && stonks alert all --all-strategies --interval 1wk --min-signals 2 >> /app/log/alert.log 2>&1 && stonks leaps all --interval 1wk >> /app/log/alert.log 2>&1
 
-# Optimization — 7b per-ticker, both intervals (Mon-Fri 10:00 UTC, ~2.7hrs, done well before pipeline)
-# Fine-tune individual strategies manually: stonks optimize --strategy X --ticker Y --model qwen2.5:32b --warm-start
-0 10 * * 1-5 stonks optimize --all-strategies --per-ticker --all-tickers --interval 1d --iterations 3 --model qwen2.5:7b >> /app/log/optimize.log 2>&1 && stonks optimize --all-strategies --per-ticker --all-tickers --interval 1wk --iterations 3 --model qwen2.5:7b >> /app/log/optimize.log 2>&1
+# Optimization is now managed from the dashboard Scheduler page (data/optimize_schedules.json),
+# dispatched by the scheduler-tick line below. The previous baked-in nightly run is kept here,
+# commented, as a reference / fallback — re-enable it if you prefer a fixed schedule:
+# 0 10 * * 1-5 stonks optimize --all-strategies --per-ticker --all-tickers --interval 1d --iterations 3 --model qwen2.5:7b >> /app/log/optimize.log 2>&1 && stonks optimize --all-strategies --per-ticker --all-tickers --interval 1wk --iterations 3 --model qwen2.5:7b >> /app/log/optimize.log 2>&1
+
+# Scheduler dispatcher — every minute, launches any dashboard-defined optimize schedule
+# whose UTC day/time matches now (data/optimize_schedules.json). Silent when nothing is due.
+* * * * * stonks scheduler-tick >> /app/log/scheduler.log 2>&1
 
 # Earnings cache refresh (Sat-Sun 12:00 UTC)
 0 12 * * 6,0 stonks earnings-refresh >> /app/log/earnings.log 2>&1
