@@ -224,7 +224,11 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
                 metrics_list.append(m)
 
         if not metrics_list:
-            logger.error("[!] All backtests failed, stopping")
+            if best_metrics_list is None:
+                logger.info("[skip] no eligible tickers (excluded by category or no data) "
+                            "— nothing to optimize")
+            else:
+                logger.warning("[!] no successful backtests this iteration — stopping early")
             break
 
         if use_leaps:
@@ -266,6 +270,14 @@ def optimize(strategy_path, tickers, interval="1d", iterations=5, model=DEFAULT_
         except Exception as e:
             logger.error(f"[!] LLM error: {e} (LLM reachable at {client.base_url()}?)")
             break
+
+    # Nothing was ever successfully backtested (e.g. every ticker excluded by the
+    # category filter) — don't write a misleading "_optimized" YAML that just holds
+    # the base params, and don't pollute the per-ticker fallback slot.
+    if best_metrics_list is None:
+        logger.info("[–] No backtests succeeded — skipping save (no optimized YAML written)")
+        return {"best_metrics": None, "best_strategy": best_strategy,
+                "history": history, "out_path": None}
 
     OPTIMIZED_DIR.mkdir(parents=True, exist_ok=True)
     parts = [strategy_path.stem]
